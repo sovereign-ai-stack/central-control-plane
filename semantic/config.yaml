@@ -1,0 +1,145 @@
+# ==============================================================================
+# vLLM Semantic Router Configuration (Role-Based & Model-Agnostic)
+# Reference: https://vllm-sr.ai/docs/installation/configuration
+#
+# Semantic Router routes strictly by abstract task roles:
+#   1. general-model   (General queries, chitchat, summaries)
+#   2. coding-model    (Software development, SQL, debugging)
+#   3. reasoning-model (Math, deep logic, multi-step problem solving)
+#   4. rag-model       (Enterprise document QA & grounded retrieval)
+# ==============================================================================
+
+version: v0.1
+
+listeners:
+  - name: http-semantic-router
+    address: 0.0.0.0
+    port: 8300
+    timeout: 300s
+
+# Unified Upstream Provider: All virtual roles forward to LiteLLM Gateway
+providers:
+  models:
+    - name: general-model
+      provider_model_id: general-model
+      api_base: http://litellm:4000/v1
+      api_key: sk-lite-master-1234
+      pricing: { prompt_per_1m: 0.0, completion_per_1m: 0.0 }
+
+    - name: coding-model
+      provider_model_id: coding-model
+      api_base: http://litellm:4000/v1
+      api_key: sk-lite-master-1234
+      pricing: { prompt_per_1m: 0.0, completion_per_1m: 0.0 }
+
+    - name: reasoning-model
+      provider_model_id: reasoning-model
+      api_base: http://litellm:4000/v1
+      api_key: sk-lite-master-1234
+      pricing: { prompt_per_1m: 0.0, completion_per_1m: 0.0 }
+
+    - name: rag-model
+      provider_model_id: rag-model
+      api_base: http://litellm:4000/v1
+      api_key: sk-lite-master-1234
+      pricing: { prompt_per_1m: 0.0, completion_per_1m: 0.0 }
+
+routing:
+  signals:
+    # 1. Semantic Vector Embeddings (Multilingual & Persian Context)
+    embeddings:
+      - name: rag_intent
+        model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+        threshold: 0.72
+        samples:
+          - "سیاست مرخصی استحقاقی و استعلاجی شرکت چیست؟"
+          - "ساعت کاری، شناوری و نحوه ثبت اضافه‌کاری در پورتال HR چگونه است؟"
+          - "بیمه تکمیلی درمان شامل چه خدماتی می‌شود؟"
+          - "سقف بودجه مجاز برای هزینه‌های ماموریت چقدر است؟"
+          - "حقوق و پاداش پرسنل چه تاریخی از ماه واریز می‌شود؟"
+          - "شرایط و آیین‌نامه دورکاری برای پرسنل چیست؟"
+          - "درخواست تعمیر تجهیزات اداری و لپ‌تاپ را چطور ثبت کنم؟"
+
+      - name: coding_intent
+        model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+        threshold: 0.72
+        samples:
+          - "این قطعه کد پایتون را دیباگ کن و مشکل مموری را بگو"
+          - "یک تابع بهینه برای مرتب‌سازی سریع در C++ بنویس"
+          - "چطور یک کوئری SQL بنویسم که رکوردهای تکراری را حذف کند؟"
+          - "یک کلاس در TypeScript برای اتصال به وب‌سوکت پیاده‌سازی کن"
+          - "یک اسکریپت Bash برای بکاپ خودکار بنویس"
+
+      - name: reasoning_intent
+        model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+        threshold: 0.72
+        samples:
+          - "اثبات کن جذر عدد ۲ یک عدد گنگ است"
+          - "این معادله دیفرانسیل مرتبه دوم را حل کن"
+          - "تحلیل ریسک سرمایه‌گذاری با مدل مارکوویتز را تشریح کن"
+          - "محاسبه احتمال شرطی با قضیه بیز برای این مسئله"
+
+    # 2. Fast Keyword Signals
+    keywords:
+      - name: rag_keywords
+        operator: OR
+        keywords: [
+          "مرخصی", "ساعت کاری", "بیمه", "حقوق", "دستمزد", "ماموریت",
+          "سیاست", "پورتال", "قوانین", "دورکاری", "اضافه‌کاری", "مزایا",
+          "فیش", "اداری", "پرسنل", "کارمند", "استعلاجی", "استحقاقی", "آیین‌نامه"
+        ]
+
+      - name: coding_keywords
+        operator: OR
+        keywords: [
+          "code", "function", "bug", "python", "sql", "api", "async",
+          "کد", "تابع", "دیباگ", "اشکال‌زدایی", "پایتون", "الگوریتم", "کوئری", "کامپایل"
+        ]
+
+      - name: reasoning_keywords
+        operator: OR
+        keywords: [
+          "prove", "derive", "theorem", "math",
+          "اثبات", "معادله", "فرمول", "احتمال", "دیفرانسیل", "استدلال", "قضیه"
+        ]
+
+  # 3. Role-Based Decision Rules
+  decisions:
+    - name: rag-route
+      priority: 10
+      when:
+        OR:
+          - rag_intent: true
+          - rag_keywords: true
+      then:
+        algorithm: priority
+        model: rag-model
+
+    - name: coding-route
+      priority: 20
+      when:
+        OR:
+          - coding_intent: true
+          - coding_keywords: true
+      then:
+        algorithm: priority
+        model: coding-model
+
+    - name: reasoning-route
+      priority: 30
+      when:
+        OR:
+          - reasoning_intent: true
+          - reasoning_keywords: true
+      then:
+        algorithm: priority
+        model: reasoning-model
+
+    - name: default-general-route
+      priority: 100
+      when: {}
+      then:
+        algorithm: priority
+        model: general-model
+
+default_model: general-model

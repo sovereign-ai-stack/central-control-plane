@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # 1. Primary PostgreSQL Database (LiteLLM Tokens, Keys & Langfuse Storage)
+  postgres:
+    image: postgres:16-alpine
+    container_name: enterprise-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-litellm}
+      POSTGRES_USER: ${POSTGRES_USER:-litellm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-litellm_secure_password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-litellm} -d ${POSTGRES_DB:-litellm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # 2. Redis In-Memory Cache (Sub-millisecond Rate Limiting & Response Caching)
+  redis:
+    image: redis:7-alpine
+    container_name: enterprise-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  # 3. Langfuse Graphical Observability & Request Tracing Dashboard
+  langfuse:
+    image: ghcr.io/langfuse/langfuse:2
+    container_name: langfuse-observability
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${LANGFUSE_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-my_secret_enterprise_nextauth_key_12345}
+      SALT: ${LANGFUSE_SALT:-my_salt_secret_12345}
+      TELEMETRY_ENABLED: "false" # Air-gapped / Offline mode
+    restart: unless-stopped
+
+  # 4. LiteLLM Reverse Proxy (Token Count, Rate Limits, API Keys, Model Routing)
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: litellm-proxy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      langfuse:
+        condition: service_started
+    ports:
+      - "${LITELLM_PORT:-4000}:4000"
+    volumes:
+      - ./litellm/config.yaml:/app/config.yaml
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LANGFUSE_HOST: http://langfuse:3000
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-enterprise-demo}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-enterprise-demo}
+      LITELLM_LOG: ${LITELLM_LOG:-INFO}
+      STORE_MODEL_IN_DB: "True"
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
+    restart: unless-stopped
+
+  # 5. Central Node Registry (Auto-Registration & Dynamic Node Health Tracking)
+  registry:
+    build: ./registry
+    container_name: central-node-registry
+    ports:
+      - "${REGISTRY_PORT:-8200}:8200"
+    environment:
+      LITELLM_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
+      NODE_TIMEOUT_SECONDS: ${NODE_TIMEOUT_SECONDS:-60}
+    depends_on:
+      - litellm
+    restart: unless-stopped
+
+  # 6. Semantic Router (Intent Classifier & Smart Request Dispatcher)
+  semantic:
+    build: ./semantic
+    container_name: semantic-router
+    ports:
+      - "${SEMANTIC_PORT:-8300}:8300"
+    environment:
+      LLM_GATEWAY_URL: http://litellm:4000
+      LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-qwen-7b}
+      RAG_URL: ${RAG_URL:-http://host.docker.internal:8100}
+    depends_on:
+      - litellm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # 7. Web Chat Interface
+  ui:
+    build: ./ui
+    container_name: chat-web-ui
+    ports:
+      - "${UI_PORT:-8400}:8400"
+    environment:
+      SEMANTIC_URL: http://semantic:8300
+    depends_on:
+      - semantic
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

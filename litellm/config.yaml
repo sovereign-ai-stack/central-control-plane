@@ -1,0 +1,84 @@
+# ==============================================================================
+# LiteLLM Enterprise Proxy Configuration (Role-Based Dynamic Routing)
+# Official Docs:
+#   - Model Management: https://docs.litellm.ai/docs/proxy/model_management
+#   - Routing & Fallbacks: https://docs.litellm.ai/docs/routing
+#   - Langfuse Observability: https://docs.litellm.ai/docs/observability/langfuse_integration
+# ==============================================================================
+
+model_list:
+  # Baseline virtual role aliases (Dynamically linked to physical nodes on auto-registration)
+  - model_name: general-model
+    litellm_params:
+      model: openai/general-model
+      api_base: http://host.docker.internal:8000/v1
+      api_key: sk-vllm-dummy
+      drop_params: true
+    model_info:
+      mode: chat
+
+  - model_name: coding-model
+    litellm_params:
+      model: openai/coding-model
+      api_base: http://host.docker.internal:8000/v1
+      api_key: sk-vllm-dummy
+      drop_params: true
+    model_info:
+      mode: chat
+
+  - model_name: reasoning-model
+    litellm_params:
+      model: openai/reasoning-model
+      api_base: http://host.docker.internal:8000/v1
+      api_key: sk-vllm-dummy
+      drop_params: true
+    model_info:
+      mode: chat
+
+  - model_name: rag-model
+    litellm_params:
+      model: openai/rag-model
+      api_base: http://host.docker.internal:8000/v1
+      api_key: sk-vllm-dummy
+      drop_params: true
+    model_info:
+      mode: chat
+
+# Load-Balancing, Failover & Resiliency
+router_settings:
+  routing_strategy: usage-based-routing-v2  # Routes to least-loaded active GPU node fulfilling the role
+  num_retries: 3                           # Retries across other healthy node replicas
+  timeout: 300
+  cooldown_time: 30                        # Quarantine failing nodes for 30s
+  allowed_fails: 1                         # Immediate circuit breaker on failure
+  enable_pre_call_checks: true             # Verifies node health before sending prompt
+  
+  # Role-Based Dynamic Fallback Matrix
+  fallbacks:
+    - "coding-model": ["reasoning-model", "general-model"]   # If dedicated coding node is down -> Try reasoning / general
+    - "reasoning-model": ["coding-model", "general-model"]   # If reasoning node is down -> Try coding / general
+    - "rag-model": ["general-model"]                         # If specialized RAG node is down -> Fallback to general
+
+litellm_settings:
+  drop_params: true
+  request_timeout: 300
+  telemetry: false                         # 100% Offline Air-Gapped Mode
+
+  # In-Memory Sub-millisecond Response Cache on Redis
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: os.environ/REDIS_PORT
+    supported_call_types: ["acompletion", "completion"]
+    ttl: 3600
+
+  # Automatic Logging & Visual Traces sent to PostgreSQL and Langfuse UI
+  success_callback: ["database", "langfuse"]
+  failure_callback: ["database", "langfuse"]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  store_model_in_db: true                  # Persist dynamically registered models in PostgreSQL
+  disable_swagger_ui: false
