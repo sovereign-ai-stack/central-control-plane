@@ -1,5 +1,5 @@
 services:
-  # 1. Primary PostgreSQL Database (LiteLLM Tokens, Keys & Langfuse Storage)
+  # 1. Primary PostgreSQL Database (LiteLLM Tokens, Keys & Storage)
   postgres:
     image: postgres:16-alpine
     container_name: enterprise-postgres
@@ -26,33 +26,14 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
-  # 3. Langfuse Graphical Observability & Request Tracing Dashboard (Docker Hub Image)
-  langfuse:
-    image: langfuse/langfuse:2
-    container_name: langfuse-observability
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "${LANGFUSE_PORT:-3000}:3000"
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
-      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-my_secret_enterprise_nextauth_key_12345}
-      SALT: ${LANGFUSE_SALT:-my_salt_secret_12345}
-      TELEMETRY_ENABLED: "false" # Air-gapped / Offline mode
-    restart: unless-stopped
-
-  # 4. LiteLLM Reverse Proxy (Docker Hub Image / Build-fallback)
+  # 3. LiteLLM Reverse Proxy (Built Locally from Lightweight Dockerfile - Zero Registry Timeout)
   litellm:
-    image: berriai/litellm:main-stable
+    build: ./litellm
     container_name: litellm-proxy
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
-      langfuse:
         condition: service_started
     ports:
       - "${LITELLM_PORT:-4000}:4000"
@@ -63,15 +44,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      LANGFUSE_HOST: http://langfuse:3000
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-enterprise-demo}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-enterprise-demo}
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
       STORE_MODEL_IN_DB: "True"
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "4"]
     restart: unless-stopped
 
-  # 5. Central Node Registry (Auto-Registration & Dynamic Node Health Tracking)
+  # 4. Central Node Registry (Auto-Registration & Dynamic Node Health Tracking)
   registry:
     build: ./registry
     container_name: central-node-registry
@@ -85,7 +63,7 @@ services:
       - litellm
     restart: unless-stopped
 
-  # 6. Semantic Router (Intent Classifier & Smart Request Dispatcher)
+  # 5. Semantic Router (Intent Classifier & Smart Request Dispatcher)
   semantic:
     build: ./semantic
     container_name: semantic-router
@@ -102,7 +80,7 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # 7. Web Chat Interface
+  # 6. Web Chat Interface
   ui:
     build: ./ui
     container_name: chat-web-ui
@@ -112,6 +90,23 @@ services:
       SEMANTIC_URL: http://semantic:8300
     depends_on:
       - semantic
+    restart: unless-stopped
+
+  # 7. Langfuse Graphical Observability (Optional background trace dashboard)
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: langfuse-observability
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${LANGFUSE_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:-my_secret_enterprise_nextauth_key_12345}
+      SALT: ${LANGFUSE_SALT:-my_salt_secret_12345}
+      TELEMETRY_ENABLED: "false"
     restart: unless-stopped
 
 volumes:
