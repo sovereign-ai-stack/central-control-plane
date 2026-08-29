@@ -26,9 +26,9 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
-  # 3. LiteLLM Reverse Proxy (Official Image with Full DB & UI Support)
+  # 3. LiteLLM Reverse Proxy (Built locally in < 150MB with offline Prisma DB ORM)
   litellm:
-    image: berriai/litellm:main-stable
+    build: ./litellm
     container_name: litellm-proxy
     depends_on:
       postgres:
@@ -46,7 +46,7 @@ services:
       REDIS_PORT: 6379
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
       STORE_MODEL_IN_DB: "True"
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    command: ["--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "4000", "--num_workers", "1"]
     restart: unless-stopped
 
   # 4. Central Node Registry (Auto-Registration & Dynamic Node Health Tracking)
