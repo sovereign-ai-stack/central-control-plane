@@ -6,11 +6,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gcc \
     libpq-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip --trusted-host pypi.org --trusted-host files.pythonhosted.org --trusted-host pypi.python.org
 
-RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org --trusted-host pypi.python.org "litellm[proxy]" psycopg2-binary redis
+# Install litellm with proxy extras, prisma ORM for PostgreSQL DB support, and redis
+RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org --trusted-host pypi.python.org "litellm[proxy]" prisma psycopg2-binary redis
 
 EXPOSE 4000
 
