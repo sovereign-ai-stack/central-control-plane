@@ -17,8 +17,8 @@ RUN pip install --upgrade pip --trusted-host pypi.org --trusted-host files.pytho
 # Install litellm with proxy extras, prisma ORM for PostgreSQL DB support, and redis
 RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org --trusted-host pypi.python.org "litellm[proxy]" prisma psycopg2-binary redis
 
-# Generate Prisma Python client bindings using system nodejs (Zero network calls required)
-RUN prisma generate
+# Generate Prisma Python client bindings using LiteLLM's official schema.prisma
+RUN python -c "import litellm, os; p=os.path.join(os.path.dirname(litellm.__file__), 'proxy', 'schema.prisma'); os.system(f'prisma generate --schema {p}')"
 
 EXPOSE 4000
 
