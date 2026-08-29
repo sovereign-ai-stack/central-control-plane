@@ -1,5 +1,5 @@
 services:
-  # 1. Primary PostgreSQL Database (LiteLLM Tokens, Keys & Storage)
+  # 1. Primary PostgreSQL Database (Langfuse Observability Storage)
   postgres:
     image: postgres:16-alpine
     container_name: enterprise-postgres
@@ -26,13 +26,11 @@ services:
       - redis-data:/data
     restart: unless-stopped
 
-  # 3. LiteLLM Reverse Proxy (Built Locally with Prisma ORM DB Persistence)
+  # 3. LiteLLM Reverse Proxy (High-Performance In-Memory & Redis Caching)
   litellm:
     build: ./litellm
     container_name: litellm-proxy
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_started
     ports:
@@ -41,12 +39,12 @@ services:
       - ./litellm/config.yaml:/app/config.yaml
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
-      STORE_MODEL_IN_DB: "True"
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+      LITELLM_LOCAL_RESOURCES: "True"
+      DISABLE_SCHEMA_UPDATE: "True"
+    command: ["--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "4000", "--num_workers", "1"]
     restart: unless-stopped
 
   # 4. Central Node Registry (Auto-Registration & Dynamic Node Health Tracking)
@@ -92,7 +90,7 @@ services:
       - semantic
     restart: unless-stopped
 
-  # 7. Langfuse Graphical Observability (Optional background trace dashboard)
+  # 7. Langfuse Graphical Observability (Open http://localhost:3000 to sign up)
   langfuse:
     image: langfuse/langfuse:2
     container_name: langfuse-observability

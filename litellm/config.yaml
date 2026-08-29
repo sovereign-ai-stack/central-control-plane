@@ -3,7 +3,6 @@
 # Official Docs:
 #   - Model Management: https://docs.litellm.ai/docs/proxy/model_management
 #   - Routing & Fallbacks: https://docs.litellm.ai/docs/routing
-#   - Langfuse Observability: https://docs.litellm.ai/docs/observability/langfuse_integration
 # ==============================================================================
 
 model_list:
@@ -55,9 +54,9 @@ router_settings:
   
   # Role-Based Dynamic Fallback Matrix
   fallbacks:
-    - "coding-model": ["reasoning-model", "general-model"]   # If dedicated coding node is down -> Try reasoning / general
-    - "reasoning-model": ["coding-model", "general-model"]   # If reasoning node is down -> Try coding / general
-    - "rag-model": ["general-model"]                         # If specialized RAG node is down -> Fallback to general
+    - "coding-model": ["reasoning-model", "general-model"]
+    - "reasoning-model": ["coding-model", "general-model"]
+    - "rag-model": ["general-model"]
 
 litellm_settings:
   drop_params: true
@@ -73,12 +72,6 @@ litellm_settings:
     supported_call_types: ["acompletion", "completion"]
     ttl: 3600
 
-  # Automatic Logging & Visual Traces sent to PostgreSQL and Langfuse UI
-  success_callback: ["database", "langfuse"]
-  failure_callback: ["database", "langfuse"]
-
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
-  database_url: os.environ/DATABASE_URL
-  store_model_in_db: true                  # Persist dynamically registered models in PostgreSQL
   disable_swagger_ui: false
