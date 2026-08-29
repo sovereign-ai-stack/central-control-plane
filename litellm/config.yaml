@@ -72,6 +72,12 @@ litellm_settings:
     supported_call_types: ["acompletion", "completion"]
     ttl: 3600
 
+  # Database Callbacks for User Keys & Token Tracking
+  success_callback: ["database"]
+  failure_callback: ["database"]
+
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  store_model_in_db: true
   disable_swagger_ui: false
