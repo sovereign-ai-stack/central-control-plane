@@ -1,12 +1,6 @@
 # ==============================================================================
-# vLLM Semantic Router Configuration (Role-Based & Model-Agnostic)
+# vLLM Semantic Router Configuration (Official vLLM-SR Schema)
 # Reference: https://vllm-sr.ai/docs/installation/configuration
-#
-# Semantic Router routes strictly by abstract task roles:
-#   1. general-model   (General queries, chitchat, summaries)
-#   2. coding-model    (Software development, SQL, debugging)
-#   3. reasoning-model (Math, deep logic, multi-step problem solving)
-#   4. rag-model       (Enterprise document QA & grounded retrieval)
 # ==============================================================================
 
 version: v0.1
@@ -17,7 +11,6 @@ listeners:
     port: 8300
     timeout: 300s
 
-# Unified Upstream Provider: All virtual roles forward to LiteLLM Gateway
 providers:
   models:
     - name: general-model
@@ -46,12 +39,11 @@ providers:
 
 routing:
   signals:
-    # 1. Semantic Vector Embeddings (Multilingual & Persian Context)
     embeddings:
       - name: rag_intent
         model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
         threshold: 0.72
-        samples:
+        candidates:
           - "سیاست مرخصی استحقاقی و استعلاجی شرکت چیست؟"
           - "ساعت کاری، شناوری و نحوه ثبت اضافه‌کاری در پورتال HR چگونه است؟"
           - "بیمه تکمیلی درمان شامل چه خدماتی می‌شود؟"
@@ -63,7 +55,7 @@ routing:
       - name: coding_intent
         model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
         threshold: 0.72
-        samples:
+        candidates:
           - "این قطعه کد پایتون را دیباگ کن و مشکل مموری را بگو"
           - "یک تابع بهینه برای مرتب‌سازی سریع در C++ بنویس"
           - "چطور یک کوئری SQL بنویسم که رکوردهای تکراری را حذف کند؟"
@@ -73,13 +65,12 @@ routing:
       - name: reasoning_intent
         model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
         threshold: 0.72
-        samples:
+        candidates:
           - "اثبات کن جذر عدد ۲ یک عدد گنگ است"
           - "این معادله دیفرانسیل مرتبه دوم را حل کن"
           - "تحلیل ریسک سرمایه‌گذاری با مدل مارکوویتز را تشریح کن"
           - "محاسبه احتمال شرطی با قضیه بیز برای این مسئله"
 
-    # 2. Fast Keyword Signals
     keywords:
       - name: rag_keywords
         operator: OR
@@ -103,43 +94,40 @@ routing:
           "اثبات", "معادله", "فرمول", "احتمال", "دیفرانسیل", "استدلال", "قضیه"
         ]
 
-  # 3. Role-Based Decision Rules
   decisions:
     - name: rag-route
-      priority: 10
-      when:
-        OR:
-          - rag_intent: true
-          - rag_keywords: true
-      then:
-        algorithm: priority
-        model: rag-model
+      description: "Route enterprise HR and policy queries to RAG pipeline"
+      rules:
+        operator: OR
+        conditions:
+          - signal: rag_intent
+          - signal: rag_keywords
+      modelRefs:
+        - rag-model
 
     - name: coding-route
-      priority: 20
-      when:
-        OR:
-          - coding_intent: true
-          - coding_keywords: true
-      then:
-        algorithm: priority
-        model: coding-model
+      description: "Route software engineering and SQL queries to coding model"
+      rules:
+        operator: OR
+        conditions:
+          - signal: coding_intent
+          - signal: coding_keywords
+      modelRefs:
+        - coding-model
 
     - name: reasoning-route
-      priority: 30
-      when:
-        OR:
-          - reasoning_intent: true
-          - reasoning_keywords: true
-      then:
-        algorithm: priority
-        model: reasoning-model
+      description: "Route math and complex logic queries to reasoning model"
+      rules:
+        operator: OR
+        conditions:
+          - signal: reasoning_intent
+          - signal: reasoning_keywords
+      modelRefs:
+        - reasoning-model
 
     - name: default-general-route
-      priority: 100
-      when: {}
-      then:
-        algorithm: priority
-        model: general-model
-
-default_model: general-model
+      description: "Fallback route for general conversational queries"
+      rules:
+        operator: ALWAYS
+      modelRefs:
+        - general-model
