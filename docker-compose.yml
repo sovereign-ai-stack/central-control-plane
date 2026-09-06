@@ -46,6 +46,9 @@ services:
       REDIS_PORT: 6379
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
       STORE_MODEL_IN_DB: "True"
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-master}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-master}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
     command: ["--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "4000", "--num_workers", "1"]
     restart: unless-stopped
 
@@ -73,26 +76,71 @@ services:
       LLM_GATEWAY_URL: http://litellm:4000
       LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
       DEFAULT_MODEL: ${DEFAULT_MODEL:-general-model}
-      RAG_URL: ${RAG_URL:-http://host.docker.internal:8100}
     depends_on:
       - litellm
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # 6. Modern Enterprise Web Chat Interface
-  ui:
-    build: ./ui
-    container_name: chat-web-ui
+  # 6. Central AI Gateway Backend API (with in-process RAG subsystem)
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    container_name: central-ai-gateway
     ports:
-      - "${UI_PORT:-8400}:8400"
+      - "${GATEWAY_PORT:-8000}:8000"
     environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
+      LITELLM_URL: http://litellm:4000
+      REGISTRY_URL: http://registry:8200
       SEMANTIC_URL: http://semantic:8300
+      RAG_VECTOR_STORE_BACKEND: ${RAG_VECTOR_STORE_BACKEND:-weaviate}
+      RAG_WEAVIATE_URL: http://weaviate:8080
+      RAG_WEAVIATE_GRPC_PORT: 50051
+      TRANSFORMERS_OFFLINE: "1"
+      APP_SECRET_PATH: ${APP_SECRET_PATH:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-8054958d-e8f3-4661-912c-69a351a5156d}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-468e625d-5c34-45c6-aca2-a0b24877b3f2}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
+      LANGFUSE_RELEASE: ${LANGFUSE_RELEASE:-v2.0.0-production}
+      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-true}
+    volumes:
+      - D:/models/bge-m3:/models/bge-m3:ro
+      - ./app:/app/app
+      - ./rag:/app/rag
+      - ./server.py:/app/server.py
     depends_on:
-      - semantic
+      postgres:
+        condition: service_healthy
+      litellm:
+        condition: service_started
+      registry:
+        condition: service_started
+      semantic:
+        condition: service_started
+      weaviate:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # 7. Langfuse Graphical Observability (Open http://localhost:3000 to sign up)
+  # 7. Modern Sovereign Enterprise Web UI (Next.js)
+  frontend:
+    build: ./frontend
+    container_name: sovereign-web-frontend
+    ports:
+      - "${UI_PORT:-8400}:3000"
+    environment:
+      BACKEND_URL: http://gateway:8000
+      APP_SECRET_PATH: ${APP_SECRET_PATH:-}
+      NEXT_PUBLIC_APP_SECRET_PATH: ${APP_SECRET_PATH:-}
+      BACKEND_APP_SECRET_PATH: ${APP_SECRET_PATH:-}
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+  # 8. Langfuse Graphical Observability (Open http://localhost:3000 to sign up)
   langfuse:
     image: langfuse/langfuse:2
     container_name: langfuse-observability
@@ -109,6 +157,31 @@ services:
       TELEMETRY_ENABLED: "false"
     restart: unless-stopped
 
+  # 9. Weaviate Vector Database (External infrastructure for production vector indexing)
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.36.1
+    container_name: enterprise-weaviate
+    restart: unless-stopped
+    ports:
+      - "${WEAVIATE_PORT:-18080}:8080"
+      - "${WEAVIATE_GRPC_PORT:-18081}:50051"
+    environment:
+      DEFAULT_VECTORIZER_MODULE: "none"
+      ENABLE_MODULES: ""
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+      QUERY_DEFAULTS_LIMIT: "25"
+      DISABLE_TELEMETRY: "true"
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/v1/.well-known/ready || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
 volumes:
   postgres-data:
   redis-data:
+  weaviate-data:
