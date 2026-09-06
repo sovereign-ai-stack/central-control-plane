@@ -69,6 +69,8 @@ class ChatService:
             user_id=user_id,
             user_team=user_team,
             db=db,
+            reply_to_id=payload.reply_to_message_id or payload.replyToMessageId,
+            reply_to_snippet=payload.reply_to_snippet or payload.replyToSnippet,
         )
 
         async def event_generator() -> AsyncGenerator[str, None]:

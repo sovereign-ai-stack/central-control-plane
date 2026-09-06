@@ -28,6 +28,8 @@ class ChatConversationManager:
         user_id: Optional[str],
         user_team: Optional[str],
         db: Session,
+        reply_to_id: Optional[str] = None,
+        reply_to_snippet: Optional[str] = None,
     ) -> Tuple[ConversationModel, List[Dict[str, Any]], int]:
         """
         Initializes or loads conversation, appends user message, and deducts initial prompt tokens.
@@ -58,12 +60,18 @@ class ChatConversationManager:
             messages_list = []
 
         user_msg_id = f"msg_{uuid.uuid4().hex[:8]}"
-        messages_list.append({
+        user_msg_entry = {
             "id": user_msg_id,
             "role": "user",
             "content": message,
             "createdAt": now,
-        })
+        }
+        if reply_to_id:
+            user_msg_entry["replyToId"] = reply_to_id
+        if reply_to_snippet:
+            user_msg_entry["replyToSnippet"] = reply_to_snippet
+
+        messages_list.append(user_msg_entry)
         conv.messages_json = json.dumps(messages_list, ensure_ascii=False)
         db.commit()
 

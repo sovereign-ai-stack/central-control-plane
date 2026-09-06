@@ -17,3 +17,7 @@ class SendMessageRequest(BaseModel):
     fileIds: Optional[List[str]] = None
     use_rag: Optional[bool] = None
     useRag: Optional[bool] = None
+    reply_to_message_id: Optional[str] = None
+    replyToMessageId: Optional[str] = None
+    reply_to_snippet: Optional[str] = None
+    replyToSnippet: Optional[str] = None
