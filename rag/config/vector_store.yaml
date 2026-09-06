@@ -1,0 +1,54 @@
+# Vector store backend (Phase 6).
+#
+# `memory` is the default so the system and its test suite run with no external
+# service. Switch to `weaviate` for production.
+#
+# SECRETS: never put an API key in this file. `api_key_env` names an environment
+# variable; the value is read at connect time and is never logged or serialised.
+vector_store:
+  backend: memory            # memory | weaviate
+
+  # Durable metadata: documents, identities, tokens, and ingest permissions.
+  # `memory` loses all of it on restart, which also makes indexed vectors
+  # unreachable, so production must set `sqlite` (or a future `postgres`).
+  metadata:
+    backend: memory          # memory | sqlite
+    path: data/rag-metadata.db
+    busy_timeout_ms: 5000
+
+  weaviate:
+    host: localhost
+    http_port: 8080
+    grpc_port: 50051
+    secure: false
+
+    collection: RagChunk
+
+    # Name of the environment variable holding the API key.
+    # Leave null for an anonymous local instance.
+    api_key_env: null        # e.g. WEAVIATE_API_KEY
+
+    timeout_init_seconds: 10
+    timeout_query_seconds: 30
+    timeout_insert_seconds: 60
+
+    batch_size: 100
+    consistency_level: QUORUM   # ONE | QUORUM | ALL
+
+    # Tenancy: one Weaviate tenant per company. Departments and documents are
+    # enforced as server-side filters because Weaviate multi-tenancy is
+    # single-level and cannot nest.
+    auto_create_collection: true
+    auto_create_tenants: true
+
+    # HNSW is approximate and does not define tie order, so fetch
+    # top_k * overfetch_factor and re-rank deterministically before truncating.
+    overfetch_factor: 4
+
+    # Fail closed rather than truncate an authorization filter that grew beyond
+    # what one query can express.
+    max_scope_document_ids: 4096
+
+    # Raise on a stored/query embedding model or dimension mismatch instead of
+    # silently returning fewer results.
+    verify_model_compatibility: true

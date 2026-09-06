@@ -1,0 +1,13 @@
+# Document chunking (Phase 5).
+#
+# `fixed_char` is the pre-Phase-5 strategy and remains the default so existing
+# corpora chunk identically. Switch to `semantic` for token-budgeted,
+# sentence-aware chunking that preserves headings, lists, and table rows.
+chunking:
+  strategy: fixed_char       # fixed_char | semantic
+  max_tokens: 220            # semantic only: chunk budget in word tokens
+  overlap_tokens: 40         # semantic only: context carried between chunks
+  min_chunk_tokens: 25       # semantic only: fold a smaller trailing chunk back
+  respect_sentences: true    # never split mid-sentence
+  respect_structure: true    # never split headings, list items, or table rows
+  max_chars: 800             # fixed_char only

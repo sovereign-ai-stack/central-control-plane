@@ -1,0 +1,27 @@
+# Production embedding model.
+#
+# Selected: BAAI/bge-m3 — see benchmarks/persian/reports/selection-decision.md
+# for the evidence and the signed gate checklist.
+#
+# The revision is pinned so a silent upstream change cannot alter embeddings
+# under an existing index. Changing model_id OR revision invalidates every
+# stored vector and REQUIRES a full reindex.
+embedding:
+  backend: sentence-transformers
+  model_id: BAAI/bge-m3
+  revision: 5617a9f61b028005a4858fdac845db406aefb181
+  device: cpu
+  batch_size: 32
+  normalize_embeddings: true
+  torch_seed: 42
+  production: true
+
+  # bge-m3 is symmetric: it needs no query/document prefixes, unlike e5, which
+  # requires "query: " / "passage: ". One less way for the query and document
+  # paths to drift apart.
+  query_prefix: null
+  document_prefix: null
+
+  preprocessing:
+    normalization_version: fa-norm-v1
+    digit_mode: preserve

@@ -1,0 +1,18 @@
+# Post-retrieval RAG pipeline (spec 005-rag-pipeline).
+# model_id stays null: production reranker selection is deferred to a benchmark,
+# exactly like the embedding model selection in config/embedding.yaml.
+pipeline:
+  rerank: false
+  backend: noop            # noop | lexical
+  model_id: null
+  max_candidates: 50
+  candidate_pool_k: 30
+  top_k: 10
+  max_context_tokens: 4096
+  dedupe_by_content_hash: true
+  context_format: delimited_v1
+  chars_per_token: 4
+  retrieval_weight: 0.5
+  lexical_weight: 0.3
+  phrase_weight: 0.2
+  strict_authorization: false

@@ -1,0 +1,8 @@
+retrieval:
+  candidate_k: 30
+  final_k: 10
+  semantic_weight: 0.7
+  lexical_weight: 0.2
+  phrase_weight: 0.1
+  max_chunks_per_document: null
+  max_context_chars: 8000

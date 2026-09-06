@@ -1,0 +1,35 @@
+# Request throttling (Phase 7).
+#
+# Two controls that defend against different things:
+#   * token bucket  — bounds the *rate* of requests, absorbing bursts
+#   * concurrency   — bounds how many embeddings run *at once*, which is what
+#                     actually saturates a CPU or GPU
+#
+# Buckets are keyed on a hash of the caller's credential, never the raw token.
+#
+# NOTE: per-IP limiting is not done here — this layer has no socket. Put an
+# IP-based limit at the ingress/proxy in front of the service.
+rate_limit:
+  enabled: true
+
+  # Retrieval and query. Burst must be >= requests_per_minute.
+  requests_per_minute: 120
+  burst: 240
+
+  # Ingestion is much heavier (extraction + chunking + N embeddings), so it has
+  # its own smaller budget and cannot starve retrieval.
+  ingest_requests_per_minute: 20
+  ingest_burst: 40
+
+  # Unauthenticated callers share one bucket. This protects the auth path from
+  # brute force; it is not a substitute for ingress-level per-IP limits.
+  anonymous_requests_per_minute: 30
+  anonymous_burst: 60
+
+  # Bounds limiter memory so credential rotation cannot exhaust it.
+  max_tracked_keys: 10000
+
+  # Simultaneous embedding operations, and how long a request waits for a slot
+  # before being told to retry.
+  max_concurrent_embeddings: 8
+  embedding_wait_seconds: 10.0

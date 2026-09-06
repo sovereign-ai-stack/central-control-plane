@@ -1,0 +1,18 @@
+# Persian NLP layer (Phase 5).
+#
+# Disabled by default: with `enabled: false` the system behaves exactly as it did
+# before Phase 5. Morphology has a second switch because normalization and
+# morphological reduction carry very different risk — over-stemming can reduce
+# Persian recall, so it stays off until the benchmark says otherwise.
+nlp:
+  enabled: false
+  normalization_version: fa-norm-v2
+  fold_digits: false
+  morphology:
+    enabled: false
+    backend: rule_based      # rule_based | hazm (hazm is an optional extra)
+    plural: true             # کتاب‌ها / کتابهای -> کتاب
+    possessive: true         # کتابمان -> کتاب
+    comparative: true        # بزرگ‌ترین -> بزرگ
+    verbs: true              # می‌روم -> رفتن
+    min_stem_length: 3       # over-stemming guard

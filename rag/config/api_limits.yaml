@@ -1,0 +1,20 @@
+# Request input limits.
+#
+# Bounds on what a single request may contain, enforced at the API boundary
+# before identity resolution, Persian NLP, or embedding. Distinct from
+# rate limiting: that bounds how *often* a caller may ask, this bounds how
+# *large* one ask may be.
+api_limits:
+  # Measured in characters, not bytes: downstream cost is per-character, and a
+  # byte limit would silently penalise Persian (multi-byte in UTF-8).
+  # Oversized queries are rejected with 413 before any expensive work.
+  max_query_chars: 4000
+
+  # Document extraction bounds. Size and page caps do not bound *time*: a
+  # pathological PDF can burn unbounded CPU inside the parser, so extraction
+  # also has a wall-clock budget. Exceeding any of these returns 413.
+  extraction:
+    max_file_bytes: 20971520       # 20 MiB
+    max_pages: 2000
+    max_extracted_chars: 5000000
+    timeout_seconds: 30.0
