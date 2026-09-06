@@ -1,0 +1,20 @@
+{
+  "candidate_id": "M2-bge-m3",
+  "model_id": "BAAI/bge-m3",
+  "split": "test",
+  "quality_metrics_valid": false,
+  "invalid_reason": "The fa-retrieval-v1 test split is degenerate by construction: its queries are of the form 'محتوای سند {title} چیست؟' where {title} is synthetic metadata (e.g. 'hr-0') that never appears in the corpus text. Labelled query/document pairs share zero distinctive tokens, so Recall@K is 0.0 for ANY model. This is a dataset artifact, not a model result — see tests/integration/embedding/test_dataset_grounding.py::test_ungrounded_title_query_would_fail_recall_at_5, and note that validate_dataset.py and the integrity suite only ever check the VALIDATION split.",
+  "selection_evidence_split": "val",
+  "performance_metrics_valid": true,
+  "dimension": 1024,
+  "dimension_source": "model.info.dimension",
+  "latency_ms_end_to_end": {
+    "p50": 220.30180000001565,
+    "p95": 441.69939999846974,
+    "p99": 636.1087000004773
+  },
+  "latency_note": "Includes embed_query plus the 220-doc similarity scan, so it is not comparable to the val-run figure, which timed embed_query alone.",
+  "throughput_chunks_per_sec": 12.62,
+  "load_time_sec": 46.063,
+  "peak_rss_mb": 1382.2
+}

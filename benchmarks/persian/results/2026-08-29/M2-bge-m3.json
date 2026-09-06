@@ -1,0 +1,97 @@
+{
+  "candidate_id": "M2-bge-m3",
+  "model_id": "BAAI/bge-m3",
+  "revision": null,
+  "production": false,
+  "dimension": 1024,
+  "dimension_source": "model.info.dimension",
+  "recall_at_k": {
+    "1": 0.046357615894039736,
+    "3": 0.07947019867549669,
+    "5": 0.11258278145695365,
+    "10": 0.15894039735099338,
+    "20": 0.271523178807947
+  },
+  "precision_at_k": {
+    "5": 0.02251655629139073,
+    "10": 0.01589403973509934
+  },
+  "mrr": 0.09404369917151577,
+  "ndcg_at_k": {
+    "5": 0.08006261127798074,
+    "10": 0.09441576746767093
+  },
+  "latency_ms": {
+    "p50": 178.28070001269225,
+    "p95": 247.6087999966694,
+    "p99": 293.5440000001108
+  },
+  "throughput_chunks_per_sec": 17.65,
+  "peak_rss_mb": null,
+  "peak_vram_mb": null,
+  "load_time_sec": 27.433,
+  "by_category": {
+    "arabic_char_variants": {
+      "recall_at_5": 0.5,
+      "mrr": 0.42013847732147497
+    },
+    "long_query": {
+      "recall_at_5": 0.0,
+      "mrr": 0.02720231550511698,
+      "recall_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "recall_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0
+    },
+    "mixed_language": {
+      "recall_at_5": 0.16666666666666666,
+      "mrr": 0.15475435540774765,
+      "recall_at_1": 0.08333333333333333,
+      "recall_at_3": 0.16666666666666666,
+      "recall_at_10": 0.3333333333333333,
+      "ndcg_at_5": 0.13591081279762146,
+      "ndcg_at_10": 0.1862882880562562
+    },
+    "paraphrase": {
+      "recall_at_5": 0.0,
+      "mrr": 0.05143097294447526,
+      "recall_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "recall_at_10": 0.09375,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.02829874058648743
+    },
+    "semantic": {
+      "recall_at_5": 0.0,
+      "mrr": 0.008654929878356006,
+      "recall_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "recall_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0
+    },
+    "short_query": {
+      "recall_at_5": 0.0,
+      "mrr": 0.03489535007616887,
+      "recall_at_1": 0.0,
+      "recall_at_3": 0.0,
+      "recall_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0
+    },
+    "technical": {
+      "recall_at_5": 0.21621621621621623,
+      "mrr": 0.11554343962891338,
+      "recall_at_1": 0.05405405405405406,
+      "recall_at_3": 0.13513513513513514,
+      "recall_at_10": 0.21621621621621623,
+      "ndcg_at_5": 0.13659159949629984,
+      "ndcg_at_10": 0.13659159949629984
+    },
+    "zwnj": {
+      "recall_at_5": 0.0625,
+      "mrr": 0.03839930464644319
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-09-01T05:14:34.933453+00:00",
+  "parameters": {
+    "chunks": 2000,
+    "documents": 100,
+    "dimension": 384,
+    "top_k": 10,
+    "queries": 50
+  },
+  "results": [
+    {
+      "backend": "in_memory",
+      "chunks": 2000,
+      "documents": 100,
+      "ingest_seconds": 0.0142,
+      "ingest_chunks_per_second": 140722.2,
+      "search_p50_ms": 8.035,
+      "search_p95_ms": 12.141,
+      "search_mean_ms": 8.471,
+      "top_k": 10,
+      "queries": 50
+    },
+    {
+      "backend": "weaviate",
+      "chunks": 2000,
+      "documents": 100,
+      "ingest_seconds": 2.8119,
+      "ingest_chunks_per_second": 711.3,
+      "search_p50_ms": 21.337,
+      "search_p95_ms": 44.78,
+      "search_mean_ms": 27.101,
+      "top_k": 10,
+      "queries": 50
+    }
+  ]
+}
