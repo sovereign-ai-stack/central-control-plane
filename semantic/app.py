@@ -30,15 +30,26 @@ if sys.stderr and hasattr(sys.stderr, "reconfigure"):
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from routes_config import (
-    CODING_KEYWORDS,
-    CODING_SAMPLES,
-    GENERAL_SAMPLES,
-    RAG_KEYWORDS,
-    RAG_SAMPLES,
-    REASONING_KEYWORDS,
-    REASONING_SAMPLES,
-)
+try:
+    from routes_config import (
+        CODING_KEYWORDS,
+        CODING_SAMPLES,
+        GENERAL_SAMPLES,
+        RAG_KEYWORDS,
+        RAG_SAMPLES,
+        REASONING_KEYWORDS,
+        REASONING_SAMPLES,
+    )
+except ImportError:
+    from semantic.routes_config import (
+        CODING_KEYWORDS,
+        CODING_SAMPLES,
+        GENERAL_SAMPLES,
+        RAG_KEYWORDS,
+        RAG_SAMPLES,
+        REASONING_KEYWORDS,
+        REASONING_SAMPLES,
+    )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [SemanticRouter] %(message)s")
 logger = logging.getLogger("SemanticRouter")
@@ -46,7 +57,7 @@ logger = logging.getLogger("SemanticRouter")
 app = FastAPI(title="Enterprise Semantic Router & LLM Dispatcher", version="2.0.0")
 
 # Service URLs from Environment
-RAG_URL = os.environ.get("RAG_URL", "http://host.docker.internal:8100")
+RAG_URL = os.environ.get("RAG_URL", "http://gateway:8000/api/rag")
 LLM_GATEWAY_URL = os.environ.get("LLM_GATEWAY_URL", "http://litellm:4000")
 LLM_GATEWAY_KEY = os.environ.get("LLM_GATEWAY_KEY", "sk-lite-master-1234")
 DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "qwen-7b")
@@ -145,7 +156,13 @@ def raw_http_json(method: str, url: str, body: Optional[Dict[str, Any]] = None, 
 
 
 def query_rag_engine(query: str, top_k: int = 4) -> List[Dict[str, Any]]:
-    """Fetches relevant document chunks from the RAG Service."""
+    """Fetches relevant document chunks from the integrated RAG subsystem."""
+    try:
+        from rag import rag_service
+        return rag_service.retrieve(query=query, top_k=top_k)
+    except Exception:
+        pass
+
     url = f"{RAG_URL.rstrip('/')}/retrieve"
     payload = {"query": query, "top_k": top_k}
     status, data = raw_http_json("POST", url, body=payload, timeout=15)
@@ -305,6 +322,21 @@ def handle_chat_query(req: ChatCompletionRequest):
 
     status, llm_resp = forward_to_litellm(payload, api_key=req.api_key)
     if status != 200:
+        if rag_chunks:
+            answer_text = (
+                "📚 **اسناد مرتبط در پایگاه دانش سازمانی (RAG) یافت شدند:**\n\n"
+                "اطلاعات مورد نظر شما از اسناد استخراج شده است (به بخش **«منابع ارجاع داده شده»** در ستون سمت چپ مراجعه فرمایید). "
+                "جهت تولید پاسخ نگارش‌شده توسط هوش مصنوعی، نود استنتاج کارت گرافیک (ai-node-agent) را روشن نمایید."
+            )
+            return ChatCompletionResponse(
+                answer=answer_text,
+                route=route_name,
+                confidence=conf,
+                used_rag=True,
+                model=chosen_model,
+                usage={},
+                rag_sources=rag_chunks,
+            )
         error_msg = llm_resp.get("error") or f"LLM Gateway Error (HTTP {status})"
         raise HTTPException(status_code=status, detail=error_msg)
 

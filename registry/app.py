@@ -86,6 +86,24 @@ def health():
     }
 
 
+def remove_node_from_litellm(node: Dict[str, Any]):
+    """Removes all routes and role aliases associated with a dead/unhealthy node from LiteLLM Proxy."""
+    models_to_remove = [node.get("served_model_name")] + [r for r in node.get("supported_roles", []) if r != node.get("served_model_name")]
+    try:
+        # Fetch current models in LiteLLM
+        status, resp = call_litellm("GET", "/model/info")
+        if status == 200 and "data" in resp:
+            for lm in resp["data"]:
+                m_info = lm.get("model_info", {})
+                if m_info.get("node_id") == node.get("node_id") or lm.get("model_name") in models_to_remove:
+                    lid = m_info.get("id")
+                    if lid:
+                        call_litellm("POST", "/model/delete", {"id": lid})
+                        logger.info(f"Purged route '{lm.get('model_name')}' (ID: {lid}) for node '{node.get('node_id')}' from LiteLLM")
+    except Exception as e:
+        logger.warning(f"Error purging node '{node.get('node_id')}' from LiteLLM: {e}")
+
+
 @app.post("/nodes/register")
 def register_node(req: NodeRegistrationRequest):
     """Registers an AI worker node and injects its model & role aliases into LiteLLM Proxy."""
@@ -154,39 +172,49 @@ def register_node(req: NodeRegistrationRequest):
 
 @app.post("/nodes/heartbeat")
 def record_heartbeat(req: HeartbeatRequest):
-    """Processes node heartbeat ping."""
+    """Processes node heartbeat ping and handles auto-disable on error/unavailable."""
     if req.node_id not in ACTIVE_NODES:
         raise HTTPException(status_code=404, detail="Node is not registered. Please call /nodes/register first.")
     
     node = ACTIVE_NODES[req.node_id]
+    prev_status = node.get("status")
     node["last_heartbeat"] = time.time()
     node["status"] = req.status
     node["active_requests"] = req.active_requests
-    return {"status": "acknowledged", "node_id": req.node_id}
+
+    # If node transitioned from healthy to unhealthy/unavailable, automatically remove from LiteLLM
+    if req.status != "healthy" and prev_status == "healthy":
+        logger.warning(f"⚠️ Node '{req.node_id}' reported status '{req.status}'. Automatically disabling its LiteLLM routes...")
+        remove_node_from_litellm(node)
+    
+    return {"status": "acknowledged", "node_id": req.node_id, "current_status": req.status}
 
 
 @app.post("/nodes/deregister")
 def deregister_node(req: DeregisterRequest):
-    """Deregisters a node and updates active list."""
+    """Deregisters a node and automatically removes it from LiteLLM Proxy."""
     if req.node_id in ACTIVE_NODES:
         node = ACTIVE_NODES.pop(req.node_id)
-        logger.info(f"Node '{req.node_id}' manually deregistered.")
-        # Note: LiteLLM model/delete can also be called here if desired
+        remove_node_from_litellm(node)
+        logger.info(f"Node '{req.node_id}' manually deregistered and purged from LiteLLM.")
         return {"success": True, "node_id": req.node_id}
     return {"success": False, "message": "Node not found"}
 
 
 @app.get("/nodes")
 def list_nodes():
-    """Returns status of all nodes, marking stale ones as offline."""
+    """Returns status of all nodes, marking stale ones as offline and purging dead routes."""
     now = time.time()
     results = []
     for node_id, data in list(ACTIVE_NODES.items()):
         elapsed = now - data["last_heartbeat"]
         node_copy = dict(data)
         node_copy["seconds_since_last_heartbeat"] = round(elapsed, 1)
-        if elapsed > NODE_TIMEOUT_SECONDS:
+        if elapsed > NODE_TIMEOUT_SECONDS and data.get("status") == "healthy":
+            data["status"] = "offline"
             node_copy["status"] = "offline"
+            logger.warning(f"⏰ Node '{node_id}' timed out after {round(elapsed, 1)}s. Auto-purging from LiteLLM...")
+            remove_node_from_litellm(data)
         results.append(node_copy)
     return results
 
