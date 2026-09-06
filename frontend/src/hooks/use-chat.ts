@@ -413,12 +413,14 @@ export function useChat(initialLanguage: Language = "fa") {
       messageText: string,
       attachments: FileAttachment[] = [],
       seededConversation?: ConversationDetail,
-      explicitUseRag?: boolean
+      explicitUseRag?: boolean,
+      replyTo?: { id: string; content: string } | null
     ) => {
       let targetConvId = seededConversation?.id ?? activeConversationId;
       const effectiveUseRag = explicitUseRag !== undefined ? explicitUseRag : useRag;
 
       const requestLanguage = seededConversation?.language ?? language;
+      const replySnippet = replyTo?.content ? (replyTo.content.slice(0, 100) + (replyTo.content.length > 100 ? "..." : "")) : undefined;
       const userMsg: Message = {
         id: crypto.randomUUID(),
         role: "user",
@@ -426,6 +428,8 @@ export function useChat(initialLanguage: Language = "fa") {
         direction: requestLanguage === "fa" ? "rtl" : "ltr",
         status: "complete",
         attachments,
+        replyToId: replyTo?.id,
+        replyToSnippet: replySnippet,
         createdAt: new Date().toISOString(),
       };
 
@@ -524,6 +528,8 @@ export function useChat(initialLanguage: Language = "fa") {
             workflowId,
             fileIds: attachments.map((attachment) => attachment.id),
             useRag: effectiveUseRag,
+            replyToMessageId: replyTo?.id,
+            replyToSnippet: replySnippet,
           }),
           signal: controller.signal,
         });

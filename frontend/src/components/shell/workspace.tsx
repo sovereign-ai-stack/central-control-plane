@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { ArrowUpRight, BookOpen, GitBranch, Layers, Menu, Plus, X } from "lucide-react";
+import { ArrowUpRight, BookOpen, GitBranch, Layers, Menu, Plus, Reply, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
@@ -331,18 +331,15 @@ export function Workspace({ initialLanguage = "fa", user, onLogout }: WorkspaceP
                   onRetry={retryLastMessage}
                   onEditMessage={editMessage}
                   pendingEditMessageId={pendingEditMessageId}
-                  onBranchMessage={async (message) => {
-                    const branched = await branchConversation(message.id);
-                    if (branched) {
-                      setReplyingBranchMessage(message);
-                      setTimeout(() => {
-                        const textarea = document.querySelector('textarea');
-                        if (textarea) {
-                          textarea.focus();
-                          textarea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
-                      }, 150);
-                    }
+                  onBranchMessage={(message) => {
+                    setReplyingBranchMessage(message);
+                    setTimeout(() => {
+                      const textarea = document.querySelector('textarea');
+                      if (textarea) {
+                        textarea.focus();
+                        textarea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                      }
+                    }, 100);
                   }}
                   className="flex-1"
                 />
@@ -360,13 +357,13 @@ export function Workspace({ initialLanguage = "fa", user, onLogout }: WorkspaceP
             <div className="absolute bottom-0 w-full bg-gradient-to-t from-canvas via-canvas/95 to-transparent pt-6 sm:pt-12 pb-2 sm:pb-4 px-2 sm:px-4 flex justify-center z-10 pointer-events-none">
               <div className="w-full max-w-3xl pointer-events-auto">
                 {replyingBranchMessage && (
-                  <div className="mb-2 flex items-center justify-between rounded-2xl border border-brand-mint/30 bg-surface-container-high/90 backdrop-blur-md px-3.5 py-2 text-xs shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="mb-2 flex items-center justify-between rounded-2xl border border-brand-cyan/30 bg-surface-container-high/90 backdrop-blur-md px-3.5 py-2 text-xs shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
                     <div className="flex items-center gap-2 overflow-hidden">
-                      <div className="flex size-5 items-center justify-center rounded-lg bg-brand-mint/15 text-brand-mint shrink-0">
-                        <GitBranch className="size-3.5" />
+                      <div className="flex size-5 items-center justify-center rounded-lg bg-brand-cyan/15 text-brand-cyan shrink-0">
+                        <Reply className="size-3.5" />
                       </div>
-                      <span className="font-bold text-brand-mint shrink-0 decorative-font">
-                        {language === "fa" ? "شاخه جدید از پاسخ:" : "Replying on new branch:"}
+                      <span className="font-bold text-brand-cyan shrink-0 decorative-font">
+                        {language === "fa" ? "در پاسخ به:" : "In reply to:"}
                       </span>
                       <span className="truncate text-on-surface-variant text-[11.5px] max-w-sm">
                         {replyingBranchMessage.content.slice(0, 80)}...
@@ -376,7 +373,7 @@ export function Workspace({ initialLanguage = "fa", user, onLogout }: WorkspaceP
                       type="button"
                       onClick={() => setReplyingBranchMessage(null)}
                       className="text-on-surface-variant/70 hover:text-on-surface p-1 rounded-md hover:bg-surface-active transition-colors shrink-0 ms-2 cursor-pointer"
-                      title={language === "fa" ? "بستن نشانگر شاخه" : "Dismiss branch indicator"}
+                      title={language === "fa" ? "انصراف از پاسخ" : "Cancel reply"}
                     >
                       <X className="size-3.5" />
                     </button>
@@ -393,8 +390,9 @@ export function Workspace({ initialLanguage = "fa", user, onLogout }: WorkspaceP
                 )}
                 <Composer
                   onSubmit={(message, attachments = [], explicitUseRag) => {
+                    const replyTarget = replyingBranchMessage;
                     setReplyingBranchMessage(null);
-                    sendMessage(message, attachments, undefined, explicitUseRag);
+                    sendMessage(message, attachments, undefined, explicitUseRag, replyTarget);
                   }}
                   onUploadPdf={uploadPdf}
                   onCancel={cancelStreaming}

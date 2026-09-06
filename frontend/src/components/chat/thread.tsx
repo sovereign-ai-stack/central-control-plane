@@ -11,6 +11,7 @@ import {
   GitBranch,
   Loader2,
   Pencil,
+  Reply,
   Sparkles,
   Volume2,
   VolumeX,
@@ -303,6 +304,13 @@ export function Thread({
                         ) : (
                           <>
                             <div className="bg-surface-raised/80 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-3.5 sm:p-5 shadow-sm border border-border/30 w-full text-start">
+                              {message.replyToSnippet && (
+                                <div className="mb-2.5 flex items-center gap-2 rounded-xl border border-brand-cyan/25 bg-brand-cyan/10 px-3 py-1.5 text-xs text-brand-cyan backdrop-blur-sm">
+                                  <Reply className="size-3 shrink-0 text-brand-cyan" />
+                                  <span className="font-bold shrink-0">{language === "fa" ? "در پاسخ به:" : "In reply to:"}</span>
+                                  <span className="truncate text-on-surface-variant text-[11.5px] opacity-90">{message.replyToSnippet}</span>
+                                </div>
+                              )}
                               {renderAttachments(message.attachments)}
                               <DirectionBoundary language={language} content={message.content}>
                                 <MarkdownContent
@@ -415,27 +423,15 @@ export function Thread({
                                   <TooltipTrigger asChild>
                                     <button
                                       type="button"
-                                      onClick={async () => {
-                                        setBranchingMessageId(message.id);
-                                        try {
-                                          await onBranchMessage(message);
-                                        } finally {
-                                          setBranchingMessageId(null);
-                                        }
-                                      }}
-                                      disabled={branchingMessageId === message.id}
-                                      className="group/branch size-7 sm:size-8 rounded-lg flex items-center justify-center text-on-surface-variant/70 hover:text-brand-mint hover:bg-brand-mint/10 border border-transparent hover:border-brand-mint/30 active:scale-90 transition-all duration-300 cursor-pointer disabled:opacity-50"
-                                      aria-label={t.actions.branch}
+                                      onClick={() => onBranchMessage(message)}
+                                      className="group/reply size-7 sm:size-8 rounded-lg flex items-center justify-center text-on-surface-variant/70 hover:text-brand-cyan hover:bg-brand-cyan/10 border border-transparent hover:border-brand-cyan/30 active:scale-90 transition-all duration-300 cursor-pointer"
+                                      aria-label={language === "fa" ? "پاسخ به این پیام" : "Reply to message"}
                                     >
-                                      {branchingMessageId === message.id ? (
-                                        <Loader2 className="size-3.5 sm:size-4 animate-spin text-brand-mint" />
-                                      ) : (
-                                        <GitBranch className="size-3.5 sm:size-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover/branch:scale-125 group-hover/branch:rotate-12 group-active/branch:rotate-45" />
-                                      )}
+                                      <Reply className="size-3.5 sm:size-4 transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover/reply:scale-125 group-hover/reply:-translate-y-0.5" />
                                     </button>
                                   </TooltipTrigger>
                                   <TooltipContent side="top" sideOffset={6} className="text-xs">
-                                    {t.actions.branch}
+                                    {language === "fa" ? "پاسخ به این پیام (Reply)" : "Reply to message"}
                                   </TooltipContent>
                                 </Tooltip>
                               )}

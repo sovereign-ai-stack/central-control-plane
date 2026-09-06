@@ -60,6 +60,8 @@ export interface Message {
   status?: MessageStatus;
   citations?: Citation[];
   attachments?: FileAttachment[];
+  replyToId?: string;
+  replyToSnippet?: string;
   createdAt: string;
 }
 
