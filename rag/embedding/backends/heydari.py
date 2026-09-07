@@ -36,5 +36,7 @@ class HeydariPersianBackend(SentenceTransformersBackend):
             preprocessing=config.preprocessing,
             candidate_id=config.candidate_id or "M3-persian-heydari",
             production=False,
+            load_timeout_sec=config.load_timeout_sec,
+            strict_load=config.strict_load,
         )
         super().__init__(normalized)

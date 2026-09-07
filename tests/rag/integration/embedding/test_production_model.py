@@ -78,6 +78,20 @@ class TestProductionSelection:
         # Cosine == dot product only if vectors are unit length.
         assert load_embedding_config().normalize_embeddings is True
 
+    def test_load_failure_is_not_answered_with_stub_vectors(self):
+        """
+        A stub fallback in production is worse than an outage.
+
+        The stub returns 384-dimensional hashes against a 1024-dimensional
+        index: retrieval keeps answering and every answer is noise. Loading
+        also has to be given a budget a ~2 GB checkpoint can actually meet,
+        or the fallback is what production always gets.
+        """
+        config = load_embedding_config()
+        assert config.strict_load is True
+        assert config.load_timeout_sec is not None
+        assert config.load_timeout_sec >= 60
+
     def test_registry_supports_the_production_backend(self):
         assert "sentence-transformers" in ModelRegistry.list_registered_backends()
 

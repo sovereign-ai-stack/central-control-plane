@@ -247,6 +247,8 @@ def _run_candidate(
         preprocessing=config.preprocessing,
         candidate_id=candidate_id,
         production=config.production,
+        load_timeout_sec=config.load_timeout_sec,
+        strict_load=config.strict_load,
     )
 
     load_started = time.perf_counter()

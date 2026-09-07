@@ -1,0 +1,103 @@
+{
+  "candidate_id": "M4-jina-v5-nano",
+  "model_id": "jinaai/jina-embeddings-v5-text-nano",
+  "revision": null,
+  "production": false,
+  "dimension": 768,
+  "dimension_source": "model.info.dimension",
+  "recall_at_k": {
+    "1": 0.849721706864564,
+    "3": 0.8803339517625232,
+    "5": 0.9044526901669759,
+    "10": 0.9619666048237476,
+    "20": 1.0
+  },
+  "precision_at_k": {
+    "5": 0.18089053803339517,
+    "10": 0.09619666048237477
+  },
+  "mrr": 0.879265538368043,
+  "ndcg_at_k": {
+    "5": 0.8775587535506263,
+    "10": 0.8958489785704478
+  },
+  "latency_ms": {
+    "p50": 144.99710000382038,
+    "p95": 521.997999996529,
+    "p99": 1539.9292000001878
+  },
+  "throughput_chunks_per_sec": 16.46,
+  "peak_rss_mb": 1866.11,
+  "peak_vram_mb": null,
+  "load_time_sec": 42.599,
+  "by_category": {
+    "arabic_char_variants": {
+      "recall_at_5": 0.8782051282051282,
+      "mrr": 0.8316808458635382
+    },
+    "long_query": {
+      "recall_at_5": 0.8910256410256411,
+      "mrr": 0.8682282105359028,
+      "recall_at_1": 0.8397435897435898,
+      "recall_at_3": 0.8653846153846154,
+      "recall_at_10": 0.9551282051282052,
+      "ndcg_at_5": 0.8647238348574282,
+      "ndcg_at_10": 0.8851738376677992
+    },
+    "mixed_language": {
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "recall_at_1": 1.0,
+      "recall_at_3": 1.0,
+      "recall_at_10": 1.0,
+      "ndcg_at_5": 1.0,
+      "ndcg_at_10": 1.0
+    },
+    "paraphrase": {
+      "recall_at_5": 0.8846153846153846,
+      "mrr": 0.8624891134506518,
+      "recall_at_1": 0.8333333333333334,
+      "recall_at_3": 0.8589743589743589,
+      "recall_at_10": 0.9551282051282052,
+      "ndcg_at_5": 0.8583135784471718,
+      "ndcg_at_10": 0.8806932607169273
+    },
+    "semantic": {
+      "recall_at_5": 0.9227272727272727,
+      "mrr": 0.9065618220163675,
+      "recall_at_1": 0.8863636363636364,
+      "recall_at_3": 0.9045454545454545,
+      "recall_at_10": 0.9681818181818181,
+      "ndcg_at_5": 0.9040769010807218,
+      "ndcg_at_10": 0.9185778121644395
+    },
+    "short_query": {
+      "recall_at_5": 0.8974358974358975,
+      "mrr": 0.8609632532709457,
+      "recall_at_1": 0.8269230769230769,
+      "recall_at_3": 0.8589743589743589,
+      "recall_at_10": 0.9615384615384616,
+      "ndcg_at_5": 0.8611883163887063,
+      "ndcg_at_10": 0.8816383191990774
+    },
+    "technical": {
+      "recall_at_5": 1.0,
+      "mrr": 1.0,
+      "recall_at_1": 1.0,
+      "recall_at_3": 1.0,
+      "recall_at_10": 1.0,
+      "ndcg_at_5": 1.0,
+      "ndcg_at_10": 1.0
+    },
+    "zwnj": {
+      "recall_at_5": 0.8974358974358975,
+      "mrr": 0.8741042789119712
+    }
+  },
+  "nlp": {
+    "enabled": false,
+    "version": null,
+    "morphology": false,
+    "normalization_version": "fa-norm-v1"
+  }
+}

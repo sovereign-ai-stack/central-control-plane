@@ -32,6 +32,13 @@ class EmbeddingConfig:
     preprocessing: PreprocessingConfig = field(default_factory=PreprocessingConfig)
     candidate_id: str | None = None
     production: bool = False
+    # Seconds allowed for backend model load. None keeps the serving defaults
+    # (short, fail-fast). Offline work such as the benchmark needs a real
+    # budget: a cold 1 GB checkpoint does not load in six seconds.
+    load_timeout_sec: float | None = None
+    # True forbids the ModelRegistry stub fallback. A benchmark that silently
+    # measures StubEmbeddingModel reports fiction, so it must fail loudly.
+    strict_load: bool = False
 
 
 def _repo_root() -> Path:
@@ -92,6 +99,12 @@ def load_candidate_config(
         preprocessing=preprocessing,
         candidate_id=candidate_id,
         production=bool(match.get("production", False)),
+        load_timeout_sec=(
+            float(benchmark["load_timeout_sec"])
+            if benchmark.get("load_timeout_sec") is not None
+            else None
+        ),
+        strict_load=bool(benchmark.get("strict_load", False)),
     )
 
 
@@ -135,4 +148,10 @@ def _config_from_mapping(block: dict[str, Any]) -> EmbeddingConfig:
         max_sequence_length=block.get("max_sequence_length"),
         preprocessing=preprocessing,
         production=bool(block.get("production", False)),
+        load_timeout_sec=(
+            float(block["load_timeout_sec"])
+            if block.get("load_timeout_sec") is not None
+            else None
+        ),
+        strict_load=bool(block.get("strict_load", False)),
     )

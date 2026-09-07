@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from rag.embedding.backends.heydari import HeydariPersianBackend
+from rag.embedding.backends.jina_v5 import JINA_V5_MODEL_IDS, JinaEmbeddingsV5Backend
 from rag.embedding.backends.sentence_transformers import SentenceTransformersBackend
 from rag.embedding.config import EmbeddingConfig
 from rag.embedding.errors import EmbeddingModelLoadError
@@ -30,8 +31,18 @@ class ModelRegistry:
             try:
                 if config.model_id == _HEYDARI_MODEL_ID or config.candidate_id == "M3-persian-heydari":
                     return HeydariPersianBackend(config)
+                if config.model_id in JINA_V5_MODEL_IDS:
+                    return JinaEmbeddingsV5Backend(config)
                 return SentenceTransformersBackend(config)
             except Exception as exc:
+                # Serving prefers a degraded answer to no answer. Measurement
+                # does not: a stub silently substituted for the model under test
+                # produces numbers that look real and mean nothing, so callers
+                # that are measuring set strict_load and get the failure.
+                if config.strict_load:
+                    raise EmbeddingModelLoadError(
+                        f"Strict load requested for {config.model_id}: {exc}"
+                    ) from exc
                 import logging
                 logging.getLogger("ModelRegistry").warning(
                     f"⚠️ SentenceTransformers failed to initialize ({exc}). Falling back to ultra-fast in-process StubEmbeddingModel."

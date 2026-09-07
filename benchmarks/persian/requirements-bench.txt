@@ -3,3 +3,7 @@ numpy>=1.26
 pyyaml>=6.0
 sentence-transformers>=3.0.0
 torch>=2.1.0
+# M4-jina-v5-nano only: its architecture and sentence-transformers module load
+# from the model repo (transformers>=4.57), and its task adapters are LoRA.
+transformers>=4.57.0
+peft>=0.15.2

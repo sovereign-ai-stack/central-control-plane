@@ -118,3 +118,12 @@ rather than silently returning degraded results.
 
 `StubEmbeddingModel` remains available and is used by the test suite, which pins
 its own embedding config and never reads this file.
+
+## 8. Subsequent candidate evaluations
+
+This decision has been re-tested against later candidates. None has displaced
+`bge-m3`.
+
+| Date | Candidate | Outcome |
+|------|-----------|---------|
+| 2026-09-07 | `M4-jina-v5-nano` — [evaluation](jina-v5-nano-evaluation.md) | Not promoted. Quality difference vs M2 within noise (Recall@5 +0.21% relative); CC-BY-NC-4.0 licence forbids commercial use. |
