@@ -45,12 +45,33 @@ candidates:
     load_locally: true
     production: false
 
+  - id: M4-jina-v5-nano
+    model_id: jinaai/jina-embeddings-v5-text-nano
+    revision: null
+    backend: sentence-transformers
+    role: candidate
+    architecture: EuroBERT-210m + LoRA task adapters (239M params)
+    description: >-
+      Jina Embeddings v5 text nano. Asymmetric retrieval model: the official
+      prompts below are required, and the retrieval LoRA adapter is selected by
+      the backend adapter. Licence is CC-BY-NC-4.0 (non-commercial).
+    query_prefix: "Query: "
+    document_prefix: "Document: "
+    expected_dimension: 768
+    production: false
+
 benchmark:
   normalization_version: fa-norm-v1
   seed: 42
   device: cpu
   batch_size: 32
   normalize_embeddings: true
+  # A cold checkpoint of several hundred MB does not load inside the fail-fast
+  # budget the serving path uses. Applied identically to every candidate.
+  load_timeout_sec: 900
+  # Never let a failed load fall back to StubEmbeddingModel: a benchmark that
+  # measures the stub reports fiction. Fail the candidate instead.
+  strict_load: true
   k_values: [1, 3, 5, 10, 20]
   ndcg_k_values: [5, 10]
   selection:

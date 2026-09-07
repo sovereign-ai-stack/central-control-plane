@@ -16,6 +16,18 @@ embedding:
   torch_seed: 42
   production: true
 
+  # bge-m3 is a ~2 GB checkpoint: it takes tens of seconds to load from a warm
+  # cache and minutes on a cold one. The loader's fail-fast default is far
+  # shorter than that, so without a real budget here the load always times out.
+  load_timeout_sec: 300
+
+  # On a load failure, fail startup instead of falling back to
+  # StubEmbeddingModel. The stub returns 384-dimensional hashes of the input:
+  # they embed nothing, they do not match this model's 1024-dimensional index,
+  # and retrieval built on them looks healthy while returning noise. A service
+  # that cannot load its embedding model must not answer queries.
+  strict_load: true
+
   # bge-m3 is symmetric: it needs no query/document prefixes, unlike e5, which
   # requires "query: " / "passage: ". One less way for the query and document
   # paths to drift apart.

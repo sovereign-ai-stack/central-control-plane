@@ -39,7 +39,7 @@ class TestBenchmarkInfrastructure:
         assert len(dataset.corpus) >= 200
         assert len(dataset.validation_query_ids) >= 80
 
-    def test_candidates_include_m0_m3(self):
+    def test_candidates_include_m0_m4(self):
         candidates = list_candidates(CANDIDATES_PATH)
         ids = {item["id"] for item in candidates}
         assert ids == {
@@ -47,6 +47,7 @@ class TestBenchmarkInfrastructure:
             "M1-e5-large",
             "M2-bge-m3",
             "M3-persian-heydari",
+            "M4-jina-v5-nano",
         }
 
     def test_m3_config_not_production(self):
@@ -82,4 +83,4 @@ class TestBenchmarkInfrastructure:
             dry_run=True,
         )
         assert summary["dry_run"] is True
-        assert len(summary["candidates"]) == 4
+        assert len(summary["candidates"]) == 5

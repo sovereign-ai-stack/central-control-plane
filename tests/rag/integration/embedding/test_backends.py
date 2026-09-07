@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from rag.embedding.backends.heydari import HeydariPersianBackend
+from rag.embedding.backends.jina_v5 import JinaEmbeddingsV5Backend
 from rag.embedding.config import load_candidate_config
 from rag.embedding.errors import EmbeddingDeviceError, EmbeddingModelLoadError
 from rag.embedding.preprocessor import EmbeddingPreprocessor
@@ -34,7 +35,13 @@ class TestLocalEmbeddingBackends:
 
     @pytest.mark.parametrize(
         "candidate_id",
-        ["M0-baseline", "M1-e5-large", "M2-bge-m3", "M3-persian-heydari"],
+        [
+            "M0-baseline",
+            "M1-e5-large",
+            "M2-bge-m3",
+            "M3-persian-heydari",
+            "M4-jina-v5-nano",
+        ],
     )
     def test_candidate_load_and_probe(self, service_factory, candidate_id: str):
         service = service_factory(candidate_id)
@@ -62,3 +69,32 @@ class TestLocalEmbeddingBackends:
         config = load_candidate_config("M0-baseline", CANDIDATES_PATH, device="cuda:99")
         with pytest.raises((EmbeddingDeviceError, EmbeddingModelLoadError)):
             ModelRegistry.create(config)
+
+    def test_m4_uses_jina_backend_with_retrieval_prompts(self):
+        config = load_candidate_config("M4-jina-v5-nano", CANDIDATES_PATH, device="cpu")
+        model = ModelRegistry.create(config)
+        assert isinstance(model, JinaEmbeddingsV5Backend)
+        # 768 is the model card's dimension, but it is asserted from the loaded
+        # model, never read back from config.
+        assert model.info.dimension == 768
+        assert model.info.query_prefix == "Query: "
+        assert model.info.document_prefix == "Document: "
+
+    def test_m4_query_and_document_paths_produce_finite_unit_vectors(self):
+        config = load_candidate_config("M4-jina-v5-nano", CANDIDATES_PATH, device="cpu")
+        service = EmbeddingService(ModelRegistry.create(config), EmbeddingPreprocessor())
+        query = service.embed_query("مرخصی استحقاقی سالانه چند روز است؟")
+        docs = service.embed_documents(
+            [
+                "طبق آیین‌نامه داخلی، مرخصی استحقاقی سالانه ۲۶ روز کاری است.",
+                "پورت پیش‌فرض سرویس پایگاه داده ۵۴۳۲ است.",
+            ]
+        )
+        matrix = np.vstack(docs.vectors)
+        assert query.vector.shape == (768,)
+        assert matrix.shape == (2, 768)
+        assert np.isfinite(query.vector).all()
+        assert np.isfinite(matrix).all()
+        assert np.allclose(np.linalg.norm(matrix, axis=1), 1.0, atol=1e-4)
+        # The relevant document must win, or the prompts are being applied wrong.
+        assert float(query.vector @ matrix[0]) > float(query.vector @ matrix[1])

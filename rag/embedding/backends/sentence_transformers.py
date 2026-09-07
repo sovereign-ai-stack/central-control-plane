@@ -22,7 +22,7 @@ class SentenceTransformersBackend:
     def __init__(self, config: EmbeddingConfig) -> None:
         self._config = config
         self._model = self._load_model(config)
-        self._dimension = int(self._model.get_sentence_embedding_dimension())
+        self._dimension = self._discover_dimension()
         max_seq = getattr(self._model, "max_seq_length", None)
         self._max_sequence_length = int(max_seq) if max_seq is not None else 512
         self._info = ModelInfo(
@@ -98,6 +98,48 @@ class SentenceTransformersBackend:
             return False
         return result.vector.shape == (self._dimension,)
 
+    def _discover_dimension(self) -> int:
+        """
+        Embedding width, asked of the model first and measured if it will not say.
+
+        A sentence-transformers module built from a repo's own `custom_st.py`
+        has no Pooling layer to interrogate, so the library reports None. The
+        width is still a fact about the loaded model — probe for it rather than
+        trusting a configured number.
+        """
+        reported = None
+        for name in ("get_sentence_embedding_dimension", "get_embedding_dimension"):
+            getter = getattr(self._model, name, None)
+            if getter is None:
+                continue
+            try:
+                reported = getter()
+            except Exception:  # noqa: BLE001 - fall through to the probe
+                reported = None
+            if reported:
+                return int(reported)
+        try:
+            probe = self._model.encode(
+                ["probe"],
+                batch_size=1,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+            )
+        except Exception as exc:
+            raise EmbeddingModelLoadError(
+                f"Could not determine embedding dimension: {exc.__class__.__name__}"
+            ) from exc
+        return int(np.asarray(probe).reshape(1, -1).shape[1])
+
+    @classmethod
+    def _sentence_transformer_kwargs(cls, config: EmbeddingConfig) -> dict:
+        """Extra SentenceTransformer constructor kwargs. Empty for stock models."""
+        return {}
+
+    @classmethod
+    def _post_load(cls, model, config: EmbeddingConfig) -> None:
+        """Adjust a freshly loaded model. No-op for stock models."""
+
     def _apply_prefix(self, text: str, *, is_query: bool) -> str:
         prefix = self._config.query_prefix if is_query else self._config.document_prefix
         if prefix:
@@ -111,8 +153,8 @@ class SentenceTransformersBackend:
             raise EmbeddingInferenceError("Expected 1-D embedding vector")
         return array
 
-    @staticmethod
-    def _load_model(config: EmbeddingConfig):
+    @classmethod
+    def _load_model(cls, config: EmbeddingConfig):
         try:
             import torch
             from sentence_transformers import SentenceTransformer
@@ -148,21 +190,31 @@ class SentenceTransformersBackend:
         target_model = local_model_path or config.model_id
         is_local_dir = bool(local_model_path)
 
+        extra_kwargs = cls._sentence_transformer_kwargs(config)
+
         def _instantiate():
             if is_local_dir:
                 return SentenceTransformer(
                     target_model,
                     device=device,
                     local_files_only=True,
+                    **extra_kwargs,
                 )
             return SentenceTransformer(
                 target_model,
                 device=device,
                 revision=config.revision,
+                **extra_kwargs,
             )
 
-        # If local directory is present, give enough time for disk load (20s), else strict 6s timeout
-        load_timeout = 20.0 if is_local_dir else 6.0
+        # If local directory is present, give enough time for disk load (20s), else strict 6s timeout.
+        # Serving wants a fail-fast load; offline work (benchmarks) sets its own
+        # budget through config, because a cold multi-hundred-MB checkpoint
+        # legitimately takes minutes and must not be silently skipped.
+        if config.load_timeout_sec is not None:
+            load_timeout = float(config.load_timeout_sec)
+        else:
+            load_timeout = 20.0 if is_local_dir else 6.0
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(_instantiate)
@@ -180,4 +232,5 @@ class SentenceTransformersBackend:
         if config.max_sequence_length is not None:
             model.max_seq_length = config.max_sequence_length
         model.eval()
+        cls._post_load(model, config)
         return model
