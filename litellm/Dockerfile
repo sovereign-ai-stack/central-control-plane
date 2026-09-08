@@ -1,23 +1,22 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.11-slim-bookworm
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
 # ============================================================
-# Debian packages - Iranian Arvan mirror
+# Debian packages - Arvan mirror
 # ============================================================
 
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf '%s\n' \
-        'deb [trusted=yes] http://mirror.arvancloud.ir/debian bookworm main' \
-        'deb [trusted=yes] http://mirror.arvancloud.ir/debian bookworm-updates main' \
+        'deb [trusted=yes] http://mirror.arvancloud.ir/debian trixie main' \
+        'deb [trusted=yes] http://mirror.arvancloud.ir/debian trixie-updates main' \
         > /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
         curl \
         gcc \
-        libpq-dev \
         git \
         nodejs \
         npm \
@@ -30,11 +29,12 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
 RUN npm install -g prisma@5.17.0
 
 # ============================================================
-# Python packages - Iranian Liara PyPI mirror
+# Python dependencies - Liara PyPI mirror
 # ============================================================
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install \
+    pip install --upgrade pip \
+    && pip install \
         --index-url https://package-mirror.liara.ir/repository/pypi/simple \
         --trusted-host package-mirror.liara.ir \
         "litellm[proxy]" \
@@ -48,6 +48,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # ============================================================
 
 RUN python -c "import litellm, os; p=os.path.join(os.path.dirname(litellm.__file__), 'proxy', 'schema.prisma'); os.system(f'prisma generate --schema {p}')"
+
+# ============================================================
+# Runtime
+# ============================================================
 
 EXPOSE 4000
 
