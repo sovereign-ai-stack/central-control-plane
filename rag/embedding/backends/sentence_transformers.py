@@ -17,16 +17,20 @@ from rag.embedding.types import EmbeddingResult, ModelInfo, QueryEmbeddingResult
 
 
 class SentenceTransformersBackend:
-    """Generic local sentence-transformers adapter with prefix and batch support."""
-
     def __init__(self, config: EmbeddingConfig) -> None:
         self._config = config
         self._model = self._load_model(config)
         self._dimension = self._discover_dimension()
         max_seq = getattr(self._model, "max_seq_length", None)
         self._max_sequence_length = int(max_seq) if max_seq is not None else 512
+        detected_name = getattr(self._model, "_detected_name", None)
+        effective_model_id = (
+            os.getenv("RAG_EMBEDDING_MODEL_ID")
+            or (detected_name if detected_name and detected_name not in ("models", "bge-m3") else None)
+            or config.model_id
+        )
         self._info = ModelInfo(
-            model_id=config.model_id,
+            model_id=effective_model_id,
             revision=config.revision,
             dimension=self._dimension,
             max_sequence_length=self._max_sequence_length,
@@ -154,6 +158,51 @@ class SentenceTransformersBackend:
         return array
 
     @classmethod
+    def _find_model_directory(cls, candidate_roots: list[str | None]) -> tuple[str | None, str | None]:
+        """
+        Smartly discovers an offline model directory among candidate root directories.
+        Returns (model_path, detected_name).
+        Supports:
+        1. A root containing model files directly (config.json, modules.json, weights, etc.)
+        2. A root containing subfolder(s) with model files (e.g. /models/any-model-name)
+        """
+        import os
+
+        def _has_model_files(path: str) -> bool:
+            if not os.path.isdir(path):
+                return False
+            try:
+                entries = set(os.listdir(path))
+                if "config.json" in entries or "modules.json" in entries or "open_clip_config.json" in entries:
+                    return True
+                return any(e.endswith(".safetensors") or e.endswith(".bin") for e in entries)
+            except OSError:
+                return False
+
+        for root in candidate_roots:
+            if not root or not os.path.isdir(root):
+                continue
+            # 1. Check if root directly contains model files
+            if _has_model_files(root):
+                return root, os.path.basename(os.path.normpath(root))
+            # 2. Check all subdirectories inside root
+            try:
+                subdirs = sorted(
+                    [
+                        os.path.join(root, d)
+                        for d in os.listdir(root)
+                        if os.path.isdir(os.path.join(root, d))
+                    ]
+                )
+                for s in subdirs:
+                    if _has_model_files(s):
+                        return s, os.path.basename(s)
+            except OSError:
+                continue
+
+        return None, None
+
+    @classmethod
     def _load_model(cls, config: EmbeddingConfig):
         try:
             import torch
@@ -174,23 +223,24 @@ class SentenceTransformersBackend:
         import concurrent.futures
 
         # Check candidate local model paths in order of preference
-        local_model_path = None
         env_model_path = os.getenv("RAG_EMBEDDING_MODEL_PATH")
-        candidate_paths = [
+        candidate_roots = [
             env_model_path,
-            config.model_id,
-            r"D:\models\bge-m3",
+            "/models",
             "/models/bge-m3",
+            "../models",
+            "./models",
+            r"D:\models\bge-m3",
+            r"D:\models",
         ]
-        for p in candidate_paths:
-            if p and os.path.isdir(p):
-                local_model_path = p
-                break
+        local_model_path, detected_name = cls._find_model_directory(candidate_roots)
 
         target_model = local_model_path or config.model_id
         is_local_dir = bool(local_model_path)
 
-        extra_kwargs = cls._sentence_transformer_kwargs(config)
+        extra_kwargs = dict(cls._sentence_transformer_kwargs(config))
+        if "trust_remote_code" not in extra_kwargs:
+            extra_kwargs["trust_remote_code"] = True
 
         def _instantiate():
             if is_local_dir:
@@ -232,5 +282,7 @@ class SentenceTransformersBackend:
         if config.max_sequence_length is not None:
             model.max_seq_length = config.max_sequence_length
         model.eval()
+        if detected_name:
+            setattr(model, "_detected_name", detected_name)
         cls._post_load(model, config)
         return model

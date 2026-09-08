@@ -21,7 +21,7 @@ services:
     image: redis:7-alpine
     container_name: enterprise-redis
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data:/data
     restart: unless-stopped
@@ -36,7 +36,7 @@ services:
       redis:
         condition: service_started
     ports:
-      - "${LITELLM_PORT:-4000}:4000"
+      - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
     volumes:
       - ./litellm/config.yaml:/app/config.yaml
     environment:
@@ -71,7 +71,7 @@ services:
     build: ./semantic
     container_name: semantic-router
     ports:
-      - "${SEMANTIC_PORT:-8300}:8300"
+      - "127.0.0.1:${SEMANTIC_PORT:-8300}:8300"
     environment:
       LLM_GATEWAY_URL: http://litellm:4000
       LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
@@ -98,7 +98,8 @@ services:
       RAG_VECTOR_STORE_BACKEND: ${RAG_VECTOR_STORE_BACKEND:-weaviate}
       RAG_WEAVIATE_URL: http://weaviate:8080
       RAG_WEAVIATE_GRPC_PORT: 50051
-      TRANSFORMERS_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: ${TRANSFORMERS_OFFLINE:-1}
+      RAG_EMBEDDING_MODEL_PATH: ${RAG_EMBEDDING_MODEL_PATH:-/models}
       APP_SECRET_PATH: ${APP_SECRET_PATH:-}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-8054958d-e8f3-4661-912c-69a351a5156d}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-468e625d-5c34-45c6-aca2-a0b24877b3f2}
@@ -106,7 +107,7 @@ services:
       LANGFUSE_RELEASE: ${LANGFUSE_RELEASE:-v2.0.0-production}
       LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-true}
     volumes:
-      - D:/models/bge-m3:/models/bge-m3:ro
+      - ${MODEL_DIR:-../models}:/models:ro
       - ./app:/app/app
       - ./rag:/app/rag
       - ./server.py:/app/server.py
@@ -148,7 +149,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "${LANGFUSE_PORT:-3000}:3000"
+      - "127.0.0.1:${LANGFUSE_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}
@@ -163,8 +164,8 @@ services:
     container_name: enterprise-weaviate
     restart: unless-stopped
     ports:
-      - "${WEAVIATE_PORT:-18080}:8080"
-      - "${WEAVIATE_GRPC_PORT:-18081}:50051"
+      - "127.0.0.1:${WEAVIATE_PORT:-18080}:8080"
+      - "127.0.0.1:${WEAVIATE_GRPC_PORT:-18081}:50051"
     environment:
       DEFAULT_VECTORIZER_MODULE: "none"
       ENABLE_MODULES: ""
