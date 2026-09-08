@@ -1,13 +1,15 @@
 # syntax=docker/dockerfile:1
 
+FROM node:20-slim AS prisma
+
+RUN npm install -g prisma@5.17.0
+
+
 FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# ============================================================
-# Debian packages - Arvan mirror
-# ============================================================
-
+# Debian packages
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf '%s\n' \
         'deb [trusted=yes] http://archive.debian.petiak.ir/debian trixie main' \
@@ -18,20 +20,13 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
         curl \
         gcc \
         git \
-        nodejs \
-        npm \
     && rm -rf /var/lib/apt/lists/*
 
-# ============================================================
-# Prisma CLI
-# ============================================================
+# Copy Prisma CLI from Node stage
+COPY --from=prisma /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=prisma /usr/local/bin/prisma /usr/local/bin/prisma
 
-RUN npm install -g prisma@5.17.0
-
-# ============================================================
-# Python dependencies - Liara PyPI mirror
-# ============================================================
-
+# Python dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip \
     && pip install \
@@ -43,15 +38,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         redis \
         "langfuse>=2.50.0,<3.0.0"
 
-# ============================================================
 # Generate Prisma client
-# ============================================================
-
 RUN python -c "import litellm, os; p=os.path.join(os.path.dirname(litellm.__file__), 'proxy', 'schema.prisma'); os.system(f'prisma generate --schema {p}')"
-
-# ============================================================
-# Runtime
-# ============================================================
 
 EXPOSE 4000
 
