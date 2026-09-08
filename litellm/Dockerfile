@@ -10,8 +10,8 @@ WORKDIR /app
 
 RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && printf '%s\n' \
-        'deb [trusted=yes] http://mirror.arvancloud.ir/debian trixie main' \
-        'deb [trusted=yes] http://mirror.arvancloud.ir/debian trixie-updates main' \
+        'deb [trusted=yes] http://archive.debian.petiak.ir/debian trixie main' \
+        'deb [trusted=yes] http://archive.debian.petiak.ir/debian trixie-updates main' \
         > /etc/apt/sources.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
