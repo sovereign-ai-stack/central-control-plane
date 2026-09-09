@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import concurrent.futures
+import os
 import time
 from collections.abc import Sequence
 
@@ -264,7 +266,8 @@ class SentenceTransformersBackend:
         if config.load_timeout_sec is not None:
             load_timeout = float(config.load_timeout_sec)
         else:
-            load_timeout = 20.0 if is_local_dir else 6.0
+            env_timeout = os.getenv("RAG_EMBEDDING_LOAD_TIMEOUT")
+            load_timeout = float(env_timeout) if env_timeout else (60.0 if is_local_dir else 10.0)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(_instantiate)
