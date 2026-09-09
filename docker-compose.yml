@@ -36,7 +36,7 @@ services:
       redis:
         condition: service_started
     ports:
-      - "127.0.0.1:${LITELLM_PORT:-4000}:4000"
+      - "${LITELLM_PORT:-4000}:4000"
     volumes:
       - ./litellm/config.yaml:/app/config.yaml
     environment:
@@ -152,7 +152,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:${LANGFUSE_PORT:-3000}:3000"
+      - "${LANGFUSE_PORT:-3000}:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
       NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3000}

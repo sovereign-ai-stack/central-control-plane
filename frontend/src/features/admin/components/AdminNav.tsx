@@ -6,7 +6,7 @@ import { ArrowLeft, ChevronRight, LogOut, Shield, Activity, ExternalLink } from 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BrandLogoIcon } from "@/components/ui/brand-logo";
-import { ALL_NAV_ITEMS, ALLOWED_OBSERVABILITY_ROLES, DEFAULT_LANGFUSE_URL, DEFAULT_LITELLM_URL, type AdminSection } from "@/features/admin/types";
+import { ALL_NAV_ITEMS, ALLOWED_OBSERVABILITY_ROLES, getLangfuseUrl, getLiteLlmUrl, type AdminSection } from "@/features/admin/types";
 import { Zap } from "lucide-react";
 import type { AuthUser, UserRole } from "@/lib/types";
 
@@ -24,6 +24,13 @@ export function AdminNav({
   onCloseMobile,
 }: AdminNavProps) {
   const role = (currentUser?.role || "super_admin") as UserRole;
+  const [langfuseUrl, setLangfuseUrl] = React.useState("http://localhost:3000");
+  const [litellmUrl, setLitellmUrl] = React.useState("http://localhost:4000");
+
+  React.useEffect(() => {
+    setLangfuseUrl(getLangfuseUrl());
+    setLitellmUrl(getLiteLlmUrl());
+  }, []);
 
   const allowedNavItems = ALL_NAV_ITEMS.filter((item) =>
     item.allowedRoles.includes(role)
@@ -43,7 +50,7 @@ export function AdminNav({
       </div>
 
       {/* 2. NAVIGATION LINKS */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-1">
+      <div className="flex-1 overflow-y-auto p-3 space-y-1 scrollbar-thin">
         <div className="px-3 py-1.5 text-[10.5px] font-bold text-on-surface-variant/70 uppercase tracking-wider">
           بخش‌های مدیریتی
         </div>
@@ -56,16 +63,22 @@ export function AdminNav({
               key={item.id}
               onClick={() => {
                 onSelectSection(item.id);
-                onCloseMobile?.();
+                if (onCloseMobile) onCloseMobile();
               }}
-              className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-medium transition-all ${
                 isActive
-                  ? "bg-brand-cyan/15 text-brand-cyan border border-brand-cyan/30 shadow-sm"
-                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container/50"
+                  ? "bg-brand-cyan/15 text-brand-cyan font-bold border border-brand-cyan/30 shadow-sm"
+                  : "text-on-surface-variant hover:text-on-surface hover:bg-surface-elevated/50"
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <Icon className={`size-4 ${isActive ? "text-brand-cyan" : "text-on-surface-variant"}`} />
+                <div
+                  className={`size-6 rounded-lg flex items-center justify-center ${
+                    isActive ? "bg-brand-cyan/20 text-brand-cyan" : "text-on-surface-variant"
+                  }`}
+                >
+                  <Icon className="size-3.5" />
+                </div>
                 <div className="text-start">
                   <div>{item.label}</div>
                   <div className="text-[10px] text-on-surface-variant/70 font-normal leading-tight">
@@ -73,7 +86,11 @@ export function AdminNav({
                   </div>
                 </div>
               </div>
-              {isActive && <ChevronRight className="size-3.5 text-brand-cyan rotate-180 shrink-0" />}
+              <ChevronRight
+                className={`size-3.5 transition-transform ${
+                  isActive ? "rotate-90 text-brand-cyan" : "text-on-surface-variant/40"
+                }`}
+              />
             </button>
           );
         })}
@@ -87,7 +104,7 @@ export function AdminNav({
 
             {/* LANGFUSE TRACING LINK */}
             <a
-              href={DEFAULT_LANGFUSE_URL}
+              href={langfuseUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold text-brand-cyan hover:bg-brand-cyan/10 border border-brand-cyan/25 transition-all group/langfuse cursor-pointer"
@@ -113,7 +130,7 @@ export function AdminNav({
 
             {/* LITELLM PROXY DASHBOARD LINK */}
             <a
-              href={DEFAULT_LITELLM_URL}
+              href={litellmUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full flex items-center justify-between p-2.5 rounded-xl text-xs font-semibold text-purple-400 hover:bg-purple-500/10 border border-purple-500/25 transition-all group/litellm cursor-pointer"

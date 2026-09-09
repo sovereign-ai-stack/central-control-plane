@@ -80,6 +80,27 @@ export const ALL_NAV_ITEMS: NavItem[] = [
 ];
 
 export const ALLOWED_OBSERVABILITY_ROLES: UserRole[] = ["super_admin"];
-export const DEFAULT_LANGFUSE_URL = process.env.NEXT_PUBLIC_LANGFUSE_URL || "http://localhost:3000";
-export const DEFAULT_LITELLM_URL = process.env.NEXT_PUBLIC_LITELLM_URL || "http://localhost:4000";
+
+export function getLangfuseUrl(): string {
+  if (process.env.NEXT_PUBLIC_LANGFUSE_URL) {
+    return process.env.NEXT_PUBLIC_LANGFUSE_URL;
+  }
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:3000`;
+  }
+  return "http://localhost:3000";
+}
+
+export function getLiteLlmUrl(): string {
+  if (process.env.NEXT_PUBLIC_LITELLM_URL) {
+    return process.env.NEXT_PUBLIC_LITELLM_URL;
+  }
+  if (typeof window !== "undefined" && window.location?.hostname) {
+    return `${window.location.protocol}//${window.location.hostname}:4000`;
+  }
+  return "http://localhost:4000";
+}
+
+export const DEFAULT_LANGFUSE_URL = "http://localhost:3000";
+export const DEFAULT_LITELLM_URL = "http://localhost:4000";
 
