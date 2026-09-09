@@ -3,6 +3,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { apiFetch, appPath } from "@/lib/api";
+import { safeRandomUUID } from "@/lib/utils";
 import type {
   Conversation,
   ConversationDetail,
@@ -422,7 +423,7 @@ export function useChat(initialLanguage: Language = "fa") {
       const requestLanguage = seededConversation?.language ?? language;
       const replySnippet = replyTo?.content ? (replyTo.content.slice(0, 100) + (replyTo.content.length > 100 ? "..." : "")) : undefined;
       const userMsg: Message = {
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         role: "user",
         content: messageText,
         direction: requestLanguage === "fa" ? "rtl" : "ltr",
@@ -507,7 +508,7 @@ export function useChat(initialLanguage: Language = "fa") {
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
-      const idempotencyKey = crypto.randomUUID();
+      const idempotencyKey = safeRandomUUID();
       const connectionError =
         requestLanguage === "fa"
           ? "ارتباط با سرویس هوشمند سازمانی برقرار نشد. لطفاً مجدداً تلاش کنید."
@@ -638,7 +639,7 @@ export function useChat(initialLanguage: Language = "fa") {
         if (controller.signal.aborted) {
           // Interrupted by user
             const interruptedMsg: Message = {
-            id: crypto.randomUUID(),
+            id: safeRandomUUID(),
             role: "assistant",
             content: streamingTextRef.current || (requestLanguage === "fa" ? "پاسخ متوقف شد." : "Generation stopped."),
             direction: requestLanguage === "fa" ? "rtl" : "ltr",
