@@ -140,6 +140,8 @@ services:
       APP_SECRET_PATH: ${APP_SECRET_PATH:-}
       NEXT_PUBLIC_APP_SECRET_PATH: ${APP_SECRET_PATH:-}
       BACKEND_APP_SECRET_PATH: ${APP_SECRET_PATH:-}
+      NEXT_PUBLIC_LANGFUSE_URL: ${NEXT_PUBLIC_LANGFUSE_URL:-}
+      NEXT_PUBLIC_LITELLM_URL: ${NEXT_PUBLIC_LITELLM_URL:-}
     depends_on:
       - gateway
     restart: unless-stopped
