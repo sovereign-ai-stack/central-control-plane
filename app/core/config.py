@@ -20,9 +20,12 @@ class Settings:
     # In-Process RAG Subsystem Configuration
     RAG_VECTOR_STORE_BACKEND: str = os.getenv("RAG_VECTOR_STORE_BACKEND", "memory")
     RAG_WEAVIATE_URL: str = os.getenv("RAG_WEAVIATE_URL", "http://localhost:18080")
+    RAG_WEAVIATE_API_KEY: str = os.getenv("RAG_WEAVIATE_API_KEY", "")
     RAG_EMBEDDING_DEVICE: str = os.getenv("RAG_EMBEDDING_DEVICE", "cpu")
     RAG_EMBEDDING_BACKEND: str = os.getenv("RAG_EMBEDDING_BACKEND", "stub")
 
+    APP_SECRET: str = os.getenv("APP_SECRET", "")
+    REGISTRY_SECRET: str = os.getenv("REGISTRY_SECRET", "")
     APP_SECRET_PATH: str = os.getenv("APP_SECRET_PATH", "").strip("/")
 
     @property

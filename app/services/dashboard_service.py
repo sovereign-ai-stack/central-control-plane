@@ -3,6 +3,7 @@ Dashboard, Models, and Limits business logic service.
 """
 
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -85,8 +86,8 @@ class DashboardService:
                     "detail": f"نود {n.get('node_id')} ({n.get('hardware', {}).get('gpus', [{}])[0].get('name', 'NVIDIA GPU') if n.get('hardware', {}).get('gpus') else 'کارت گرافیک فعال'})",
                     "nodeId": n.get("node_id"),
                     "gpu": n.get("hardware", {}).get("gpus", [{}])[0].get("name", "NVIDIA GPU") if n.get("hardware", {}).get("gpus") else "کارت گرافیک فعال",
-                    "ip": n.get("ip", "127.0.0.1"),
-                    "port": n.get("port", 8000),
+                    "ip": n.get("ip") or (urlparse(n.get("api_base", "")).hostname if n.get("api_base") else "127.0.0.1"),
+                    "port": n.get("port") or (urlparse(n.get("api_base", "")).port if n.get("api_base") else 8000),
                     "enabled": True,
                     "isDefault": True,
                     "latencyMs": 140,
@@ -105,14 +106,16 @@ class DashboardService:
             for n in active_nodes:
                 gpus = n.get("hardware", {}).get("gpus", [])
                 gpu_desc = gpus[0].get("name", "NVIDIA GPU") if gpus else "کارت گرافیک فعال"
+                node_ip = n.get("ip") or (urlparse(n.get("api_base", "")).hostname if n.get("api_base") else "127.0.0.1")
+                node_port = n.get("port") or (urlparse(n.get("api_base", "")).port if n.get("api_base") else 8000)
                 live_models.append({
                     "id": n.get("served_model_name", "general-model"),
                     "name": n.get("model_name", "Qwen 2.5"),
                     "detail": f"نود {n.get('node_id')} ({gpu_desc})",
                     "nodeId": n.get("node_id"),
                     "gpu": gpu_desc,
-                    "ip": n.get("ip", "127.0.0.1"),
-                    "port": n.get("port", 8000),
+                    "ip": node_ip,
+                    "port": node_port,
                     "enabled": True,
                     "isDefault": True,
                     "latencyMs": 140,

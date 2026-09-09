@@ -15,4 +15,4 @@ pipeline:
   retrieval_weight: 0.5
   lexical_weight: 0.3
   phrase_weight: 0.2
-  strict_authorization: false
+  strict_authorization: true

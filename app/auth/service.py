@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException, Response
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password, needs_rehash, verify_password
 from app.models.user import SessionModel, UserModel
 
 
@@ -16,10 +17,15 @@ class AuthService:
     def login(email: str, password: str, response: Response, db: Session) -> Dict[str, Any]:
         email_clean = email.strip().lower()
         user = db.query(UserModel).filter(UserModel.email == email_clean).first()
-        if not user or user.password != password:
+        if not user or not verify_password(password, user.password):
             raise HTTPException(status_code=401, detail="ایمیل یا گذرواژه وارد شده نامعتبر است.")
         if not user.is_active:
             raise HTTPException(status_code=403, detail="حساب کاربری شما توسط مدیر سازمان غیرفعال شده است.")
+
+        # Seamless auto-migration: if user still has legacy plaintext password, upgrade to PBKDF2 hash
+        if needs_rehash(user.password):
+            user.password = hash_password(password)
+            db.commit()
 
         session_token = f"sess_{uuid.uuid4().hex}"
         now = datetime.now(timezone.utc).isoformat()

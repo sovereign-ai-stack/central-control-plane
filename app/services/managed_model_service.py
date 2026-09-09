@@ -71,17 +71,29 @@ class ManagedModelService:
             litellm_models = litellm_client.get_registered_models()
             deleted_count = 0
 
-            # 2. Purge stale/orphaned models from LiteLLM only if DB models exist
-            if enabled_models:
-                for lm in litellm_models:
-                    m_info = lm.get("model_info", {})
-                    lid = m_info.get("id")
-                    db_mid = m_info.get("db_model_id")
+            # 2. Purge stale/orphaned DB models from LiteLLM (without touching node models)
+            for lm in litellm_models:
+                m_info = lm.get("model_info", {})
+                lid = m_info.get("id")
+                db_mid = m_info.get("db_model_id")
+                node_id = m_info.get("node_id")
 
-                    if not db_mid or db_mid not in enabled_map or lm.get("model_name") != enabled_map[db_mid].assigned_role:
+                # Dynamic worker nodes registered via Node Registry (Path B) manage their own lifecycle.
+                # Do NOT purge them here under any circumstance!
+                if node_id:
+                    continue
+
+                # If this model was managed by DB, check if it's still enabled and role matches
+                if db_mid:
+                    if db_mid not in enabled_map or lm.get("model_name") != enabled_map[db_mid].assigned_role:
                         if lid:
                             litellm_client.delete_model_by_id(lid)
                             deleted_count += 1
+                elif enabled_models:
+                    # Legacy or unmanaged orphaned route without node_id and without db_mid
+                    if lid:
+                        litellm_client.delete_model_by_id(lid)
+                        deleted_count += 1
 
             # 3. Register/Update all enabled models into LiteLLM
             synced_count = 0
@@ -92,6 +104,15 @@ class ManagedModelService:
             # 4. Guarantee all standard roles have a working backend dynamically
             standard_roles = ["general-model", "coding-model", "reasoning-model", "rag-model"]
             active_roles = {m.assigned_role for m in enabled_models}
+
+            # Include roles already actively served by dynamic GPU nodes
+            node_provided_roles = {
+                lm.get("model_name")
+                for lm in litellm_models
+                if lm.get("model_info", {}).get("node_id")
+            }
+            active_roles.update(node_provided_roles)
+
             fallback_source = enabled_models[0] if enabled_models else None
 
             if fallback_source:

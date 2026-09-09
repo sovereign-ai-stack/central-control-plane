@@ -368,12 +368,16 @@ class RAGService:
         options = RetrievalOptions(top_k=top_k, candidate_k=max(top_k * 2, 8))
         req_id = uuid.uuid4()
 
-        retrieval_result = self.app.retrieval_service.search(
-            query=query,
-            request_id=req_id,
-            trusted_identity=trusted_identity,
-            options=options,
-        )
+        try:
+            retrieval_result = self.app.retrieval_service.search(
+                query=query,
+                request_id=req_id,
+                trusted_identity=trusted_identity,
+                options=options,
+            )
+        except Exception as e:
+            logger.error(f"[RAGService] Vector search failed for query '{query[:40]}...': {e}", exc_info=True)
+            raise
 
         formatted_chunks = []
         for chunk in retrieval_result.chunks:

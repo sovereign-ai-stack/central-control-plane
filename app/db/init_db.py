@@ -2,10 +2,13 @@
 Database initialization and seeding.
 """
 
+import os
 from datetime import datetime, timezone
-from app.core.logging import logger
 import sqlalchemy as sa
 from sqlalchemy import inspect, text
+
+from app.core.logging import logger
+from app.core.security import hash_password, needs_rehash
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.models import (
@@ -60,13 +63,15 @@ def init_db():
     db = SessionLocal()
     try:
         super_admin = db.query(UserModel).filter(UserModel.email == "admin@sovereign.local").first()
+        admin_plain_password = os.getenv("ADMIN_INITIAL_PASSWORD", "admin")
+
         if not super_admin:
             now = datetime.now(timezone.utc).isoformat()
             root_user = UserModel(
                 id="u_super_admin",
                 email="admin@sovereign.local",
                 name="مهدی جعفری",
-                password="admin",
+                password=hash_password(admin_plain_password),
                 role="super_admin",
                 organization_id=None,
                 team_id=None,
@@ -77,7 +82,14 @@ def init_db():
             )
             db.add(root_user)
             db.commit()
-            logger.info("👑 Initial Super Admin (مهدی جعفری) seeded to persistent DB.")
+            if admin_plain_password == "admin":
+                logger.warning("⚠️ Super Admin seeded with default password 'admin'. Please set ADMIN_INITIAL_PASSWORD in production!")
+            logger.info("👑 Initial Super Admin (مهدی جعفری) seeded to persistent DB with secure PBKDF2 hash.")
+        elif needs_rehash(super_admin.password):
+            # If root admin exists with legacy plaintext password, upgrade to PBKDF2 hash
+            super_admin.password = hash_password(super_admin.password)
+            db.commit()
+            logger.info("🔒 Upgraded existing Super Admin password to secure PBKDF2 hash.")
 
         # Re-hydrate all persistent documents into RAG vector index asynchronously in background
         import threading

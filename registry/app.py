@@ -5,8 +5,9 @@ import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [Registry] %(message)s")
@@ -16,10 +17,30 @@ app = FastAPI(title="Enterprise Node Registry & Dynamic LLM Coordinator", versio
 
 LITELLM_URL = os.environ.get("LITELLM_URL", "http://litellm:4000")
 LITELLM_MASTER_KEY = os.environ.get("LITELLM_MASTER_KEY", "sk-lite-1234")
+REGISTRY_SECRET = os.environ.get("REGISTRY_SECRET", "")
 NODE_TIMEOUT_SECONDS = int(os.environ.get("NODE_TIMEOUT_SECONDS", "60"))
 
 # In-memory node store (can be persisted to Redis/Postgres in production)
 ACTIVE_NODES: Dict[str, Dict[str, Any]] = {}
+
+
+def verify_registry_auth(
+    authorization: Optional[str] = Header(None),
+    x_registry_secret: Optional[str] = Header(None),
+) -> None:
+    """Verifies internal registry authentication if REGISTRY_SECRET is configured."""
+    if not REGISTRY_SECRET:
+        return
+    token = None
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization[7:].strip()
+    elif x_registry_secret:
+        token = x_registry_secret.strip()
+    if token != REGISTRY_SECRET:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized: invalid or missing registry authentication secret.",
+        )
 
 
 class HardwareInfoModel(BaseModel):
@@ -32,6 +53,8 @@ class HardwareInfoModel(BaseModel):
 class NodeRegistrationRequest(BaseModel):
     node_id: str = Field(..., description="Unique node identifier")
     api_base: str = Field(..., description="Reachable HTTP base (e.g. http://10.0.0.5:8000)")
+    ip: Optional[str] = Field(None, description="Explicit node IP address if available")
+    port: Optional[int] = Field(None, description="Explicit node port if available")
     model_name: str = Field(..., description="Full model identifier (e.g. Qwen/Qwen2.5-7B-Instruct-AWQ)")
     served_model_name: str = Field(..., description="Public alias in gateway (e.g. qwen-7b)")
     supported_roles: List[str] = Field(default_factory=list, description="Virtual role aliases (e.g. general-model, rag-model)")
@@ -88,23 +111,26 @@ def health():
 
 def remove_node_from_litellm(node: Dict[str, Any]):
     """Removes all routes and role aliases associated with a dead/unhealthy node from LiteLLM Proxy."""
-    models_to_remove = [node.get("served_model_name")] + [r for r in node.get("supported_roles", []) if r != node.get("served_model_name")]
+    target_node_id = node.get("node_id")
+    if not target_node_id:
+        return
     try:
         # Fetch current models in LiteLLM
         status, resp = call_litellm("GET", "/model/info")
         if status == 200 and "data" in resp:
             for lm in resp["data"]:
                 m_info = lm.get("model_info", {})
-                if m_info.get("node_id") == node.get("node_id") or lm.get("model_name") in models_to_remove:
+                # Strictly match by node_id so routes of other nodes or DB models are NEVER accidentally purged
+                if m_info.get("node_id") == target_node_id:
                     lid = m_info.get("id")
                     if lid:
                         call_litellm("POST", "/model/delete", {"id": lid})
-                        logger.info(f"Purged route '{lm.get('model_name')}' (ID: {lid}) for node '{node.get('node_id')}' from LiteLLM")
+                        logger.info(f"Purged route '{lm.get('model_name')}' (ID: {lid}) for node '{target_node_id}' from LiteLLM")
     except Exception as e:
-        logger.warning(f"Error purging node '{node.get('node_id')}' from LiteLLM: {e}")
+        logger.warning(f"Error purging node '{target_node_id}' from LiteLLM: {e}")
 
 
-@app.post("/nodes/register")
+@app.post("/nodes/register", dependencies=[Depends(verify_registry_auth)])
 def register_node(req: NodeRegistrationRequest):
     """Registers an AI worker node and injects its model & role aliases into LiteLLM Proxy."""
     clean_base = req.api_base.rstrip("/")
@@ -112,6 +138,10 @@ def register_node(req: NodeRegistrationRequest):
         v1_base = f"{clean_base}/v1"
     else:
         v1_base = clean_base
+
+    parsed = urlparse(req.api_base)
+    node_ip = req.ip or parsed.hostname or "127.0.0.1"
+    node_port = req.port or parsed.port or (443 if parsed.scheme == "https" else 80)
 
     # Models and roles to register in LiteLLM
     models_to_register = [req.served_model_name] + [r for r in req.supported_roles if r != req.served_model_name]
@@ -149,6 +179,8 @@ def register_node(req: NodeRegistrationRequest):
     node_record = {
         "node_id": req.node_id,
         "api_base": req.api_base,
+        "ip": node_ip,
+        "port": node_port,
         "model_name": req.model_name,
         "served_model_name": req.served_model_name,
         "supported_roles": req.supported_roles,
@@ -160,17 +192,19 @@ def register_node(req: NodeRegistrationRequest):
     }
     ACTIVE_NODES[req.node_id] = node_record
 
-    logger.info(f"Node '{req.node_id}' registered successfully (Model: {req.served_model_name}, Roles: {req.supported_roles}). Sync: {overall_ok}")
+    logger.info(f"Node '{req.node_id}' registered successfully (IP: {node_ip}:{node_port}, Model: {req.served_model_name}, Roles: {req.supported_roles}). Sync: {overall_ok}")
     return {
         "success": overall_ok,
         "node_id": req.node_id,
+        "ip": node_ip,
+        "port": node_port,
         "served_model_name": req.served_model_name,
         "supported_roles": req.supported_roles,
         "litellm_sync": sync_results,
     }
 
 
-@app.post("/nodes/heartbeat")
+@app.post("/nodes/heartbeat", dependencies=[Depends(verify_registry_auth)])
 def record_heartbeat(req: HeartbeatRequest):
     """Processes node heartbeat ping and handles auto-disable on error/unavailable."""
     if req.node_id not in ACTIVE_NODES:
@@ -190,7 +224,7 @@ def record_heartbeat(req: HeartbeatRequest):
     return {"status": "acknowledged", "node_id": req.node_id, "current_status": req.status}
 
 
-@app.post("/nodes/deregister")
+@app.post("/nodes/deregister", dependencies=[Depends(verify_registry_auth)])
 def deregister_node(req: DeregisterRequest):
     """Deregisters a node and automatically removes it from LiteLLM Proxy."""
     if req.node_id in ACTIVE_NODES:

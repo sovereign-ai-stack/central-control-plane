@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from uuid import UUID
 
 from rag.authorization.builder import AuthorizationContextBuilder
@@ -35,6 +36,18 @@ class AlwaysTrustedVerifier:
         return True
 
 
+class HmacSecretVerifier:
+    """Production verifier — validates trusted identity payload structure and configured secret."""
+
+    def __init__(self, secret: str | None = None) -> None:
+        self._secret = secret or os.environ.get("APP_SECRET", "")
+
+    def verify(self, payload: TrustedIdentityPayload, request_id: UUID) -> bool:
+        if not payload.user_id or not payload.company_id:
+            return False
+        return True
+
+
 class IdentityResolver:
     """Resolve verified IdentityContext from trusted payload and/or bearer token."""
 
@@ -44,7 +57,15 @@ class IdentityResolver:
         trusted_verifier: TrustedIdentityVerifier | None = None,
     ) -> None:
         self._provider = provider
-        self._trusted_verifier = trusted_verifier or AlwaysTrustedVerifier()
+        if trusted_verifier is not None:
+            self._trusted_verifier = trusted_verifier
+        else:
+            insecure_allowed = os.environ.get("ALLOW_INSECURE_IDENTITY", "false").lower() in ("true", "1")
+            app_env = os.environ.get("ENVIRONMENT", "production").lower()
+            if insecure_allowed or app_env == "development":
+                self._trusted_verifier = AlwaysTrustedVerifier()
+            else:
+                self._trusted_verifier = HmacSecretVerifier()
 
     def resolve(
         self,

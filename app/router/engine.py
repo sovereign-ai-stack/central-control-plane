@@ -143,8 +143,8 @@ class SemanticRouterEngine:
                 )
                 if semantic_res and "route" in semantic_res:
                     s_route = semantic_res.get("route", "general")
-                    # If semantic service suggested RAG but toggle is not enabled, fallback to general
-                    if s_route == "rag" and not explicit_use_rag:
+                    # Only fallback to general if user explicitly disabled RAG (explicit_use_rag is False)
+                    if s_route == "rag" and explicit_use_rag is False:
                         s_route = "general"
                     s_conf = float(semantic_res.get("confidence", 0.92))
                     return RouteClassificationResult(

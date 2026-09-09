@@ -45,6 +45,8 @@ class FederatedSearchService:
             except Exception as e:
                 logger.warning(f"Error querying distinct doc orgs for super admin: {e}")
 
+        retrieval_errors: List[str] = []
+
         # 2. Search target organizations
         for org_id in org_targets:
             try:
@@ -71,7 +73,8 @@ class FederatedSearchService:
                         })
                         context_parts.append(f"[{c.get('title')} - {c.get('section')}]\n{c.get('content')}")
             except Exception as e:
-                logger.warning(f"Error querying org '{org_id}' in RAG: {e}")
+                logger.error(f"[FederatedSearch] Failed querying org '{org_id}' in RAG: {e}", exc_info=True)
+                retrieval_errors.append(f"org:{org_id}:{str(e)}")
 
         # 3. Global Shared Knowledge Shard
         try:
@@ -98,11 +101,22 @@ class FederatedSearchService:
                     })
                     context_parts.append(f"[{c.get('title')} - {c.get('section')}]\n{c.get('content')}")
         except Exception as e:
-            logger.warning(f"Error querying global shard in RAG: {e}")
+            logger.error(f"[FederatedSearch] Failed querying global shard in RAG: {e}", exc_info=True)
+            retrieval_errors.append(f"global:{str(e)}")
+
+        total_shards = max(1, len(org_targets) + 1)
+        if len(retrieval_errors) >= total_shards:
+            status = "failed"
+        elif retrieval_errors:
+            status = "degraded"
+        else:
+            status = "ok"
 
         return {
             "citations": citations,
             "context": "\n\n".join(context_parts),
+            "status": status,
+            "errors": retrieval_errors,
         }
 
     @classmethod
@@ -124,25 +138,38 @@ class FederatedSearchService:
         t_start = time.time()
         real_citations = []
         rag_context_text = ""
+        overall_status = "ok"
+        all_errors = []
 
         try:
             res = cls._execute_search_pass(query, user, user_org, user_team, user_id, db)
-            if res and res.get("citations"):
-                real_citations = res["citations"]
-                rag_context_text = res.get("context", "")
+            if res:
+                overall_status = res.get("status", "ok")
+                all_errors.extend(res.get("errors", []))
+                if res.get("citations"):
+                    real_citations = res["citations"]
+                    rag_context_text = res.get("context", "")
 
             # Fallback to contextual rewritten query
             if not real_citations and has_history and contextual_query != query:
                 res_ctx = cls._execute_search_pass(contextual_query, user, user_org, user_team, user_id, db)
-                if res_ctx and res_ctx.get("citations"):
-                    real_citations = res_ctx["citations"]
-                    rag_context_text = res_ctx.get("context", "")
+                if res_ctx:
+                    if res_ctx.get("status") == "failed" and overall_status == "ok":
+                        overall_status = "failed"
+                    all_errors.extend(res_ctx.get("errors", []))
+                    if res_ctx.get("citations"):
+                        real_citations = res_ctx["citations"]
+                        rag_context_text = res_ctx.get("context", "")
         except Exception as e:
-            logger.warning(f"Federated RAG search warning: {e}")
+            logger.error(f"[FederatedSearch] Critical error during federated search: {e}", exc_info=True)
+            overall_status = "failed"
+            all_errors.append(str(e))
 
         latency_ms = round((time.time() - t_start) * 1000, 2)
         return {
             "citations": real_citations,
             "context": rag_context_text,
             "latency_ms": latency_ms,
+            "retrieval_status": overall_status,
+            "retrieval_errors": all_errors,
         }

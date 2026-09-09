@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.integrations.litellm import litellm_client
 from app.models.team import TeamModel
 from app.models.user import UserModel
@@ -86,7 +87,7 @@ class UserService:
             id=user_id,
             email=email,
             name=payload.name,
-            password=payload.password,
+            password=hash_password(payload.password),
             role=target_role,
             organization_id=target_org,
             team_id=target_team,
@@ -131,7 +132,7 @@ class UserService:
         if payload.name:
             target_user.name = payload.name
         if payload.password and payload.password.strip():
-            target_user.password = payload.password.strip()
+            target_user.password = hash_password(payload.password.strip())
         if payload.tokenLimit is not None:
             target_user.token_limit = payload.tokenLimit
         if payload.isActive is not None:
