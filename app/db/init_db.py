@@ -62,15 +62,20 @@ def init_db():
     _auto_migrate_columns()
     db = SessionLocal()
     try:
-        super_admin = db.query(UserModel).filter(UserModel.email == "admin@sovereign.local").first()
-        admin_plain_password = os.getenv("ADMIN_INITIAL_PASSWORD", "admin")
+        admin_email = os.getenv("ADMIN_INITIAL_EMAIL", "admin@sovereign.local").strip()
+        admin_plain_password = os.getenv("ADMIN_INITIAL_PASSWORD", "admin").strip()
+        admin_name = os.getenv("ADMIN_INITIAL_NAME", "مهدی جعفری").strip()
+
+        super_admin = db.query(UserModel).filter(
+            (UserModel.email == admin_email) | (UserModel.role == "super_admin")
+        ).first()
 
         if not super_admin:
             now = datetime.now(timezone.utc).isoformat()
             root_user = UserModel(
                 id="u_super_admin",
-                email="admin@sovereign.local",
-                name="مهدی جعفری",
+                email=admin_email,
+                name=admin_name,
                 password=hash_password(admin_plain_password),
                 role="super_admin",
                 organization_id=None,
@@ -84,7 +89,7 @@ def init_db():
             db.commit()
             if admin_plain_password == "admin":
                 logger.warning("⚠️ Super Admin seeded with default password 'admin'. Please set ADMIN_INITIAL_PASSWORD in production!")
-            logger.info("👑 Initial Super Admin (مهدی جعفری) seeded to persistent DB with secure PBKDF2 hash.")
+            logger.info(f"👑 Initial Super Admin ({admin_name} - {admin_email}) seeded to persistent DB with secure PBKDF2 hash.")
         elif needs_rehash(super_admin.password):
             # If root admin exists with legacy plaintext password, upgrade to PBKDF2 hash
             super_admin.password = hash_password(super_admin.password)
