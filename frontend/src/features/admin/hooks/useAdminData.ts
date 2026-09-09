@@ -33,6 +33,8 @@ export function useAdminData() {
   const [documents, setDocuments] = React.useState<RagDocument[]>([]);
   const [models, setModels] = React.useState<AdminModelAccess[]>([]);
 
+  const currentUserRef = React.useRef<AuthUser | null>(null);
+
   const loadData = React.useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) setRefreshing(true);
@@ -43,7 +45,11 @@ export function useAdminData() {
         const meData = await getMeApi();
         meUser = meData?.user || meData;
         if (meUser) {
-          setCurrentUser(meUser);
+          currentUserRef.current = meUser;
+          setCurrentUser((prev) => {
+            if (prev?.id === meUser?.id && prev?.role === meUser?.role) return prev;
+            return meUser;
+          });
         }
       } catch {
         // Fallback for initial state
@@ -90,7 +96,7 @@ export function useAdminData() {
       }
 
       // 7. Models (Only for super_admin)
-      const currentRole = meUser?.role || currentUser?.role;
+      const currentRole = meUser?.role || currentUserRef.current?.role;
       if (currentRole === "super_admin") {
         try {
           const modelsData = await fetchAdminModels();
@@ -105,18 +111,20 @@ export function useAdminData() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [currentUser]);
+  }, []);
 
   React.useEffect(() => {
     loadData();
   }, [loadData]);
 
   // Auto-poll documents when any document is processing in background
+  const isProcessing = React.useMemo(
+    () => documents.some((d) => d.status === "processing"),
+    [documents]
+  );
+
   React.useEffect(() => {
-    const hasPendingDocs = documents.some(
-      (d) => d.status === "processing"
-    );
-    if (!hasPendingDocs) return;
+    if (!isProcessing) return;
 
     const interval = setInterval(async () => {
       try {
@@ -130,7 +138,7 @@ export function useAdminData() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [documents]);
+  }, [isProcessing]);
 
   return {
     currentUser,
