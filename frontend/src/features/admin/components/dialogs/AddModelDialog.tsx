@@ -32,41 +32,28 @@ interface AddModelDialogProps {
 }
 
 const PROVIDERS = [
-  { id: "deepseek", name: "DeepSeek", logo: "🔵", desc: "مدل‌های پرقدرت DeepSeek V3 و R1" },
-  { id: "openai", name: "OpenAI", logo: "🟢", desc: "مدل‌های GPT-4o, o1, GPT-4o-mini" },
-  { id: "anthropic", name: "Anthropic", logo: "🟣", desc: "مدل‌های Claude 3.5 Sonnet, Haiku" },
-  { id: "gemini", name: "Google Gemini", logo: "🔷", desc: "مدل‌های Gemini 1.5 Pro, Flash" },
-  { id: "openrouter", name: "OpenRouter", logo: "🌐", desc: "درگاه تجمیعی بیش از ۲۰۰ مدل کلود" },
-  { id: "custom_vllm", name: "vLLM / سرور لوکال", logo: "⚡", desc: "کارت گرافیک سازمان و سرور محلی" },
+  { id: "openai", name: "OpenAI و سازگار", logo: "🟢", desc: "OpenAI, DeepSeek, OpenRouter, Anthropic و APIهای سازگار" },
+  { id: "gemini", name: "Google Gemini", logo: "🔷", desc: "مدل‌های گوگل جمینای با API Key" },
+  { id: "custom_vllm", name: "vLLM / سرور لوکال", logo: "⚡", desc: "سرورهای محلی، Ollama و کارت‌های گرافیک کلاستر" },
 ];
 
-const PRESETS: Record<string, Array<{ id: string; label: string; name: string; role: string; ctx: number }>> = {
-  deepseek: [
-    { id: "deepseek-reasoner", label: "DeepSeek R1 (استدلال)", name: "DeepSeek R1 Reasoner", role: "reasoning-model", ctx: 64000 },
-    { id: "deepseek-chat", label: "DeepSeek V3 (عمومی)", name: "DeepSeek V3 Chat", role: "general-model", ctx: 64000 },
-  ],
+const PRESETS: Record<string, Array<{ id: string; label: string; name: string; role: string; ctx: number; apiBase?: string }>> = {
   openai: [
-    { id: "gpt-4o", label: "GPT-4o (همه‌منظوره)", name: "OpenAI GPT-4o", role: "general-model", ctx: 128000 },
-    { id: "gpt-4o-mini", label: "GPT-4o Mini (سریع و سبک)", name: "GPT-4o Mini", role: "general-model", ctx: 128000 },
-    { id: "o1-preview", label: "o1 Preview (استدلال و ریاضی)", name: "OpenAI o1", role: "reasoning-model", ctx: 128000 },
-  ],
-  anthropic: [
-    { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet (کدنویسی برتر)", name: "Claude 3.5 Sonnet", role: "coding-model", ctx: 200000 },
-    { id: "claude-3-haiku-20240307", label: "Claude 3 Haiku (فوق سریع)", name: "Claude 3 Haiku", role: "general-model", ctx: 200000 },
+    { id: "gpt-4o", label: "GPT-4o (OpenAI)", name: "OpenAI GPT-4o", role: "general-model", ctx: 128000, apiBase: "" },
+    { id: "gpt-4o-mini", label: "GPT-4o Mini (OpenAI)", name: "GPT-4o Mini", role: "general-model", ctx: 128000, apiBase: "" },
+    { id: "o1-preview", label: "o1 Preview (استدلال)", name: "OpenAI o1", role: "reasoning-model", ctx: 128000, apiBase: "" },
+    { id: "deepseek/deepseek-reasoner", label: "DeepSeek R1 (استدلال)", name: "DeepSeek R1 Reasoner", role: "reasoning-model", ctx: 64000, apiBase: "https://api.deepseek.com" },
+    { id: "deepseek/deepseek-chat", label: "DeepSeek V3 (عمومی)", name: "DeepSeek V3 Chat", role: "general-model", ctx: 64000, apiBase: "https://api.deepseek.com" },
+    { id: "openrouter/anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet (OpenRouter)", name: "Claude 3.5 Sonnet", role: "coding-model", ctx: 200000, apiBase: "https://openrouter.ai/api/v1" },
   ],
   gemini: [
-    { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash (سریع و پایدار)", name: "Google Gemini 3.5 Flash", role: "general-model", ctx: 1000000 },
-    { id: "gemini-3.6-flash", label: "Gemini 3.6 Flash (نسل پیشرفته)", name: "Google Gemini 3.6 Flash", role: "general-model", ctx: 1000000 },
-    { id: "gemma-4-31b-it", label: "Gemma 4 31B IT (مدل متنی باز)", name: "Google Gemma 4 31B", role: "general-model", ctx: 128000 },
-  ],
-  openrouter: [
-    { id: "anthropic/claude-3.5-sonnet", label: "Claude 3.5 Sonnet via OpenRouter", name: "Claude 3.5 (OpenRouter)", role: "coding-model", ctx: 200000 },
-    { id: "openai/gpt-4o", label: "GPT-4o via OpenRouter", name: "GPT-4o (OpenRouter)", role: "general-model", ctx: 128000 },
-    { id: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B", name: "Llama 3.3 70B", role: "general-model", ctx: 128000 },
+    { id: "gemini/gemini-2.5-flash", label: "Gemini 2.5 Flash (سریع)", name: "Google Gemini 2.5 Flash", role: "general-model", ctx: 1000000, apiBase: "" },
+    { id: "gemini/gemini-1.5-pro", label: "Gemini 1.5 Pro (تحلیلی)", name: "Google Gemini 1.5 Pro", role: "reasoning-model", ctx: 1000000, apiBase: "" },
+    { id: "gemini/gemma-2-27b-it", label: "Gemma 2 27B (متن‌باز)", name: "Google Gemma 2", role: "general-model", ctx: 128000, apiBase: "" },
   ],
   custom_vllm: [
-    { id: "Qwen/Qwen2.5-7B-Instruct-AWQ", label: "Qwen 2.5 7B Local", name: "Qwen 2.5 7B Local", role: "general-model", ctx: 32768 },
-    { id: "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B", label: "DeepSeek R1 14B Distill", name: "DeepSeek R1 14B Local", role: "reasoning-model", ctx: 32768 },
+    { id: "openai/Qwen/Qwen2.5-7B-Instruct-AWQ", label: "Qwen 2.5 7B Local", name: "Qwen 2.5 7B Local", role: "general-model", ctx: 32768, apiBase: "http://host.docker.internal:8000/v1" },
+    { id: "openai/deepseek-ai/DeepSeek-R1-Distill-Qwen-14B", label: "DeepSeek R1 14B Local", name: "DeepSeek R1 14B Local", role: "reasoning-model", ctx: 32768, apiBase: "http://host.docker.internal:8000/v1" },
   ],
 };
 
@@ -78,13 +65,13 @@ const ROLES = [
 ];
 
 export function AddModelDialog({ open, onOpenChange, onSubmit }: AddModelDialogProps) {
-  const [provider, setProvider] = React.useState<string>("deepseek");
-  const [name, setName] = React.useState<string>("DeepSeek Reasoner");
-  const [modelId, setModelId] = React.useState<string>("deepseek-reasoner");
-  const [assignedRole, setAssignedRole] = React.useState<string>("reasoning-model");
+  const [provider, setProvider] = React.useState<string>("openai");
+  const [name, setName] = React.useState<string>("OpenAI GPT-4o");
+  const [modelId, setModelId] = React.useState<string>("gpt-4o");
+  const [assignedRole, setAssignedRole] = React.useState<string>("general-model");
   const [apiKey, setApiKey] = React.useState<string>("");
-  const [apiBase, setApiBase] = React.useState<string>("https://api.deepseek.com");
-  const [contextWindow, setContextWindow] = React.useState<number>(64000);
+  const [apiBase, setApiBase] = React.useState<string>("");
+  const [contextWindow, setContextWindow] = React.useState<number>(128000);
   const [showKey, setShowKey] = React.useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
 
@@ -97,18 +84,14 @@ export function AddModelDialog({ open, onOpenChange, onSubmit }: AddModelDialogP
     }
   };
 
-  const handlePresetSelect = (preset: { id: string; label: string; name: string; role: string; ctx: number }) => {
+  const handlePresetSelect = (preset: { id: string; label: string; name: string; role: string; ctx: number; apiBase?: string }) => {
     setModelId(preset.id);
     setName(preset.name);
     setAssignedRole(preset.role);
     setContextWindow(preset.ctx);
-    if (provider === "deepseek") {
-      setApiBase("https://api.deepseek.com");
-    } else if (provider === "custom_vllm") {
-      setApiBase("http://host.docker.internal:8000/v1");
+    setApiBase(preset.apiBase ?? (provider === "custom_vllm" ? "http://host.docker.internal:8000/v1" : ""));
+    if (provider === "custom_vllm" && !apiKey) {
       setApiKey("sk-vllm-dummy");
-    } else {
-      setApiBase("");
     }
   };
 
