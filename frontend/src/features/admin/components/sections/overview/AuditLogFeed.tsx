@@ -34,10 +34,14 @@ export function AuditLogFeed({ activeNodesCount, totalDocs }: AuditLogFeedProps)
             <div className="flex-1 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-on-surface">همگام‌سازی خودکار نودهای پردازشی GPU</span>
-                <span className="text-[10px] text-on-surface-variant font-mono">پایدار ({Math.max(1, activeNodesCount)} نود)</span>
+                <span className="text-[10px] text-on-surface-variant font-mono">
+                  {activeNodesCount > 0 ? `پایدار (${activeNodesCount} نود)` : "در انتظار اتصال نود (۰ نود)"}
+                </span>
               </div>
               <p className="text-[11px] text-on-surface-variant mt-0.5">
-                ضربان قلب نودها تأیید شد و مسیرهای استنتاجی <code className="font-mono text-brand-cyan">general-model</code> و <code className="font-mono text-brand-cyan">coding-model</code> در پایگاه پروکسی به‌روزرسانی گردید.
+                {activeNodesCount > 0
+                  ? "ضربان قلب نودها تأیید شد و مسیرهای استنتاجی در پایگاه پروکسی به‌روزرسانی گردید."
+                  : "هنوز ورکر یا نود پردازشی به رجیستری مرکزی متصل نشده است."}
               </p>
             </div>
           </div>

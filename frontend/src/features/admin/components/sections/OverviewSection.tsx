@@ -50,8 +50,8 @@ export function OverviewSection({
 
   // VRAM & Hardware summary
   const totalVramGb = activeNodes.reduce((acc, node: any) => {
-    return acc + (node?.hardware?.total_vram_gb || 24);
-  }, activeNodes.length > 0 ? 0 : 24);
+    return acc + (node?.hardware?.total_vram_gb || 0);
+  }, 0);
 
   // Error State: if dashboard completely failed to load
   if (!dashboard && !users.length && !organizations.length) {

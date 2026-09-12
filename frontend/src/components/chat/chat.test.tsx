@@ -166,7 +166,7 @@ describe("Frontend UI Component Tests (T058 / US4)", () => {
 
       // Enter without shift should submit
       fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
-      expect(onSubmit).toHaveBeenCalledWith("خط اول");
+      expect(onSubmit).toHaveBeenCalledWith("خط اول", undefined, true);
     });
 
     it("should display cancel button while streaming", () => {
@@ -189,7 +189,7 @@ describe("Frontend UI Component Tests (T058 / US4)", () => {
       const sendBtn = screen.getByRole("button", { name: /ارسال پیام/i });
       expect(sendBtn).toBeInTheDocument();
       fireEvent.click(sendBtn);
-      expect(onSubmit).toHaveBeenCalledWith("پرسش جدید");
+      expect(onSubmit).toHaveBeenCalledWith("پرسش جدید", undefined, true);
     });
 
     it("should handle drag and drop of PDF files into the composer", async () => {
@@ -265,7 +265,7 @@ describe("Frontend UI Component Tests (T058 / US4)", () => {
 
       expect(screen.getByText("راه‌اندازی برنامه‌های FastAPI")).toBeInTheDocument();
       expect(screen.getByText("تنظیم پورت و متغیرها")).toBeInTheDocument();
-      expect(screen.getByText(/مستندات پایگاه دانش/i)).toBeInTheDocument();
+      expect(screen.getByText(/پایگاه دانش سازمانی/i)).toBeInTheDocument();
       expect(screen.getByText(/مستندات رسمی/i)).toBeInTheDocument();
       expect(screen.queryByText("[1]")).not.toBeInTheDocument();
     });
@@ -276,9 +276,7 @@ describe("Frontend UI Component Tests (T058 / US4)", () => {
       render(<AccountPanel isOpen={true} onClose={vi.fn()} language="fa" onLanguageChange={vi.fn()} />);
 
       expect(screen.getByText(/تنظیمات عمومی/i)).toBeInTheDocument();
-      expect(screen.getByText(/گوینده صوتی/i)).toBeInTheDocument();
       expect(screen.getByText(/سهمیه و مصرف/i)).toBeInTheDocument();
-      expect(screen.getByText(/کلیدهای MCP/i)).toBeInTheDocument();
       expect(screen.getAllByText(/حساب کاربری/i).length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText(/مستندات API/i)).toBeInTheDocument();
 

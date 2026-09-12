@@ -186,6 +186,7 @@ export function Workspace({ initialLanguage = "fa", user, onLogout }: WorkspaceP
           onDeleteConversation={(id) => setDeleteTargetId(id)}
           onOpenAccount={() => setAccountOpen(true)}
           onToggleLanguage={handleToggleLanguage}
+          user={user}
           language={language}
           isSharing={shareLoading}
           collapsed={rightSidebarCollapsed}
@@ -452,6 +453,7 @@ export function Workspace({ initialLanguage = "fa", user, onLogout }: WorkspaceP
               setAccountOpen(true);
             }}
             onToggleLanguage={handleToggleLanguage}
+            user={user}
             language={language}
             isSharing={shareLoading}
             className="flex w-full h-full m-0 rounded-none border-0"

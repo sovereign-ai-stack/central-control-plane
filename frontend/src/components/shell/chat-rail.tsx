@@ -29,7 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { BrandLogoFull, BrandLogoIcon } from "@/components/ui/brand-logo";
 import { useTranslation } from "@/lib/locale";
-import type { Conversation, Language } from "@/lib/types";
+import type { AuthUser, Conversation, Language } from "@/lib/types";
 
 export interface ChatRailProps extends React.ComponentProps<"nav"> {
   conversations: Conversation[];
@@ -41,6 +41,7 @@ export interface ChatRailProps extends React.ComponentProps<"nav"> {
   onDeleteConversation: (id: string) => void;
   onOpenAccount: () => void;
   onToggleLanguage?: () => void;
+  user?: AuthUser;
   language?: Language;
   isSharing?: boolean;
   collapsed?: boolean;
@@ -57,6 +58,7 @@ export function ChatRail({
   onDeleteConversation,
   onOpenAccount,
   onToggleLanguage,
+  user,
   language = "fa",
   isSharing = false,
   collapsed = false,
@@ -64,6 +66,7 @@ export function ChatRail({
   className,
   ...props
 }: ChatRailProps) {
+  const hasAdminAccess = Boolean(user?.role && ["super_admin", "org_admin", "team_admin"].includes(user.role));
   const t = useTranslation(language);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editTitle, setEditTitle] = React.useState("");
@@ -361,15 +364,17 @@ export function ChatRail({
       >
         {!collapsed && (
           <ul className="space-y-1 mb-2">
-            <li>
-              <Link
-                href={appPath("admin")}
-                className="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface text-[13px] hover:bg-surface-raised/40 rounded-2xl transition-colors decorative-font"
-              >
-                <Gauge className="size-4 text-brand-cyan" />
-                <span>Admin panel</span>
-              </Link>
-            </li>
+            {hasAdminAccess && (
+              <li>
+                <Link
+                  href={appPath("admin")}
+                  className="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface text-[13px] hover:bg-surface-raised/40 rounded-2xl transition-colors decorative-font"
+                >
+                  <Gauge className="size-4 text-brand-cyan" />
+                  <span>{language === "fa" ? "پنل مدیریت سازمانی" : "Admin Panel"}</span>
+                </Link>
+              </li>
+            )}
             <li>
               <button
                 type="button"

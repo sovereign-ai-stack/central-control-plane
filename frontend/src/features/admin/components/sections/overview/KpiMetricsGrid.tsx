@@ -98,8 +98,12 @@ export function KpiMetricsGrid({
           <div className="space-y-1">
             <div className="text-[11px] text-on-surface-variant font-medium">نودهای فعال GPU</div>
             <div className="text-2xl font-black text-emerald-400 font-mono flex items-center gap-1.5">
-              <span>{Math.max(1, activeNodesCount)}</span>
-              <span className="size-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>{activeNodesCount}</span>
+              {activeNodesCount > 0 ? (
+                <span className="size-2 rounded-full bg-emerald-400 animate-pulse" title="آنلاین"></span>
+              ) : (
+                <span className="size-2 rounded-full bg-on-surface-variant/40" title="آفلاین"></span>
+              )}
             </div>
             <div className="text-[10px] text-on-surface-variant flex items-center gap-1">
               <Cpu className="size-3 text-emerald-400" />
