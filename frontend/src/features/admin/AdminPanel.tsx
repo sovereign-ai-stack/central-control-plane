@@ -28,6 +28,8 @@ import { useTeamManagement } from "./hooks/useTeamManagement";
 import { useUserManagement } from "./hooks/useUserManagement";
 import type { AdminSection } from "./types";
 
+import { AuthScreen } from "@/components/auth/auth-screen";
+
 export function AdminPanel() {
   const [activeSection, setActiveSection] = React.useState<AdminSection>("overview");
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
@@ -85,9 +87,20 @@ export function AdminPanel() {
     );
   }
 
-  // Unauthorized access guard: user must be logged in with admin privileges
-  const hasAdminAccess = currentUser && currentUser.role && currentUser.role !== "user";
-  if (!hasAdminAccess) {
+  // 1. Not signed in: show Login Screen
+  if (!currentUser) {
+    return (
+      <AuthScreen
+        language="fa"
+        onAuthenticated={() => {
+          void loadData(true);
+        }}
+      />
+    );
+  }
+
+  // 2. Signed in but standard user without admin rights: show Access Denied
+  if (currentUser.role === "user") {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-canvas text-on-surface p-4" dir="rtl">
         <div className="flex flex-col items-center gap-4 max-w-md w-full p-6 bg-surface-raised border border-border/40 rounded-2xl text-center shadow-lg">
@@ -97,7 +110,7 @@ export function AdminPanel() {
           <div>
             <h2 className="text-base font-bold text-on-surface">دسترسی غیرمجاز به پنل مدیریت</h2>
             <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">
-              شما اجازه دسترسی به پنل مدیریت را ندارید یا نشست کاربری شما منقضی شده است. لطفاً با حسابی که دسترسی مدیریتی دارد وارد شوید.
+              حساب کاربری شما دارای سطح دسترسی مدیریت نیست. لطفاً برای دسترسی به این بخش با حساب مدیر وارد شوید.
             </p>
           </div>
           <Button
