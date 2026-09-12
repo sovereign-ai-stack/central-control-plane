@@ -62,7 +62,7 @@ export function UploadDocDialog({
   organizations,
   teams,
   currentUserOrgId,
-  currentUserRole = "super_admin",
+  currentUserRole = "user",
   onSubmit,
 }: UploadDocDialogProps) {
   const isSuperAdmin = currentUserRole === "super_admin";

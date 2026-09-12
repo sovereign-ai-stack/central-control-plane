@@ -23,7 +23,7 @@ export function AdminNav({
   currentUser,
   onCloseMobile,
 }: AdminNavProps) {
-  const role = (currentUser?.role || "super_admin") as UserRole;
+  const role = (currentUser?.role || "user") as UserRole;
   const [langfuseUrl, setLangfuseUrl] = React.useState(getLangfuseUrl);
   const [litellmUrl, setLitellmUrl] = React.useState(getLiteLlmUrl);
 

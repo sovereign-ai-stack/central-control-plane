@@ -52,7 +52,13 @@ export function useAdminData() {
           });
         }
       } catch {
-        // Fallback for initial state
+        // Unauthenticated or network error
+      }
+
+      // If user is not authenticated or does not have admin permissions, do not fetch admin data
+      const currentRole = meUser?.role || currentUserRef.current?.role;
+      if (!currentRole || currentRole === "user") {
+        return;
       }
 
       // 2. Overview / Dashboard
@@ -96,7 +102,6 @@ export function useAdminData() {
       }
 
       // 7. Models (Only for super_admin)
-      const currentRole = meUser?.role || currentUserRef.current?.role;
       if (currentRole === "super_admin") {
         try {
           const modelsData = await fetchAdminModels();

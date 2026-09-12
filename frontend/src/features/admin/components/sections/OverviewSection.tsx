@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertCircle, BookOpen, Bot, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { AdminDashboard, AuthUser } from "@/lib/types";
+import type { AdminDashboard, AuthUser, UserRole } from "@/lib/types";
 import type { AdminSection } from "../../types";
 import { AuditLogFeed } from "./overview/AuditLogFeed";
 import { ClusterStatusCard } from "./overview/ClusterStatusCard";
@@ -37,7 +37,7 @@ export function OverviewSection({
   onSelectSection,
   onRefresh,
 }: OverviewSectionProps) {
-  const role = currentUser?.role || "super_admin";
+  const role = (currentUser?.role || "user") as UserRole;
 
   const totalUsers = dashboard?.totalUsers ?? users.length;
   const totalOrgs = dashboard?.totalOrganizations ?? Math.max(1, organizations.length);

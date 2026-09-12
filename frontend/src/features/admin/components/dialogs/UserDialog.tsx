@@ -64,7 +64,7 @@ export function UserDialog({
   onIsActiveChange,
   organizations,
   teams,
-  currentUserRole = "super_admin",
+  currentUserRole = "user",
   onSubmit,
 }: UserDialogProps) {
   const isSuperAdmin = currentUserRole === "super_admin";

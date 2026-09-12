@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Loader2, Shield } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { AdminHeader } from "./components/AdminHeader";
@@ -78,6 +80,36 @@ export function AdminPanel() {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 text-brand-cyan animate-spin" />
           <div className="text-xs font-semibold text-on-surface-variant">در حال بارگذاری پنل مدیریت سازمانی...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Unauthorized access guard: user must be logged in with admin privileges
+  const hasAdminAccess = currentUser && currentUser.role && currentUser.role !== "user";
+  if (!hasAdminAccess) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-canvas text-on-surface p-4" dir="rtl">
+        <div className="flex flex-col items-center gap-4 max-w-md w-full p-6 bg-surface-raised border border-border/40 rounded-2xl text-center shadow-lg">
+          <div className="size-12 rounded-full bg-destructive/15 text-destructive flex items-center justify-center">
+            <Shield className="size-6" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-on-surface">دسترسی غیرمجاز به پنل مدیریت</h2>
+            <p className="text-xs text-on-surface-variant mt-2 leading-relaxed">
+              شما اجازه دسترسی به پنل مدیریت را ندارید یا نشست کاربری شما منقضی شده است. لطفاً با حسابی که دسترسی مدیریتی دارد وارد شوید.
+            </p>
+          </div>
+          <Button
+            asChild
+            variant="default"
+            className="bg-brand-cyan hover:bg-brand-cyan/90 text-surface font-semibold text-xs rounded-xl px-5 mt-2"
+          >
+            <Link href="/">
+              <ArrowLeft className="size-4 ms-1.5 rotate-180" />
+              بازگشت به صفحه چت
+            </Link>
+          </Button>
         </div>
       </div>
     );
