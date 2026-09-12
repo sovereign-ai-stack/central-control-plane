@@ -1,9 +1,7 @@
 # Persian NLP layer (Phase 5).
 #
-# Disabled by default: with `enabled: false` the system behaves exactly as it did
-# before Phase 5. Morphology has a second switch because normalization and
-# morphological reduction carry very different risk — over-stemming can reduce
-# Persian recall, so it stays off until the benchmark says otherwise.
+# Defaults are conservative (enabled: false) for regression baseline.
+# Can be enabled via RAG_NLP_ENABLED=true in production .env.
 nlp:
   enabled: false
   normalization_version: fa-norm-v2

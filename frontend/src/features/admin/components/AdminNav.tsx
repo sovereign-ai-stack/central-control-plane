@@ -23,9 +23,8 @@ export function AdminNav({
   currentUser,
   onCloseMobile,
 }: AdminNavProps) {
-  const role = (currentUser?.role || "super_admin") as UserRole;
-  const [langfuseUrl, setLangfuseUrl] = React.useState("http://localhost:3000");
-  const [litellmUrl, setLitellmUrl] = React.useState("http://localhost:4000");
+  const [langfuseUrl, setLangfuseUrl] = React.useState(getLangfuseUrl);
+  const [litellmUrl, setLitellmUrl] = React.useState(getLiteLlmUrl);
 
   React.useEffect(() => {
     setLangfuseUrl(getLangfuseUrl());

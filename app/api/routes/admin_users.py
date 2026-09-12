@@ -50,3 +50,13 @@ async def update_user(user_id: str, payload: UpdateUserRequest, user: Dict[str, 
 @router.delete("/{user_id}", response_model=DeleteResponse)
 async def delete_user(user_id: str, user: Dict[str, Any] = Depends(get_current_user), db: Session = Depends(get_db)):
     return user_service.delete_user(user_id=user_id, caller=user, db=db)
+
+
+@router.post("/sync-litellm", response_model=Dict[str, Any])
+async def reconcile_litellm_users(user: Dict[str, Any] = Depends(get_current_user), db: Session = Depends(get_db)):
+    return user_service.reconcile_all_users_with_litellm(caller=user, db=db)
+
+
+@router.post("/{user_id}/sync-litellm", response_model=Dict[str, Any])
+async def sync_litellm_user(user_id: str, user: Dict[str, Any] = Depends(get_current_user), db: Session = Depends(get_db)):
+    return user_service.sync_user_by_id(user_id=user_id, caller=user, db=db)

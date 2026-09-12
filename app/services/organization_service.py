@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.integrations.litellm import litellm_client
@@ -16,6 +17,19 @@ from app.schemas.organization import CreateOrgRequest, UpdateOrgRequest
 
 
 class OrganizationService:
+    @staticmethod
+    def get_organization_used_tokens(db: Session, org_id: str) -> int:
+        """
+        Canonical single source of truth for organization token consumption.
+        Computes the sum of used tokens across all users belonging to the organization.
+        """
+        return (
+            db.query(func.coalesce(func.sum(UserModel.used_tokens), 0))
+            .filter(UserModel.organization_id == org_id)
+            .scalar()
+            or 0
+        )
+
     @staticmethod
     def list_organizations(user: Dict[str, Any], db: Session) -> List[Dict[str, Any]]:
         role = user.get("role", "super_admin")
@@ -30,7 +44,7 @@ class OrganizationService:
 
         res = []
         for org in orgs:
-            used_tokens = sum(t.used_tokens for t in org.teams) if org.teams else 0
+            used_tokens = OrganizationService.get_organization_used_tokens(db, org.id)
             res.append(org.to_dict(total_used_tokens=used_tokens))
         return res
 
@@ -48,7 +62,7 @@ class OrganizationService:
 
         teams = db.query(TeamModel).filter(TeamModel.organization_id == org_id).all()
         users = db.query(UserModel).filter(UserModel.organization_id == org_id).all()
-        total_used = sum(t.used_tokens for t in teams) if teams else 0
+        total_used = OrganizationService.get_organization_used_tokens(db, org_id)
 
         return {
             "organization": org.to_dict(total_used_tokens=total_used),

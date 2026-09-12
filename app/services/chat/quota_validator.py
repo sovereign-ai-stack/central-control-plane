@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.models.organization import OrganizationModel
 from app.models.team import TeamModel
 from app.models.user import UserModel
+from app.services.organization_service import OrganizationService
 
 
 class ChatQuotaValidator:
@@ -40,12 +41,7 @@ class ChatQuotaValidator:
         if user_org:
             org_obj = db.query(OrganizationModel).filter(OrganizationModel.id == user_org).first()
             if org_obj:
-                org_total_used = (
-                    db.query(func.coalesce(func.sum(TeamModel.used_tokens), 0))
-                    .filter(TeamModel.organization_id == user_org)
-                    .scalar()
-                    or 0
-                )
+                org_total_used = OrganizationService.get_organization_used_tokens(db, user_org)
                 if org_total_used >= org_obj.token_limit:
                     async def org_quota_stream() -> AsyncGenerator[str, None]:
                         err_txt = (

@@ -121,8 +121,11 @@ export function Workspace({ initialLanguage = "fa", user, onLogout }: WorkspaceP
   };
 
   const handleSelectMessage = (messageId: string) => {
-    setSelectedMessageId(messageId);
-    setLeftSidebarOpen(true);
+    const targetMsg = (activeConversation?.messages || []).find((m) => m.id === messageId);
+    if (targetMsg?.citations && targetMsg.citations.length > 0) {
+      setSelectedMessageId(messageId);
+      setLeftSidebarOpen(true);
+    }
   };
 
   const handleToggleLanguage = () => {

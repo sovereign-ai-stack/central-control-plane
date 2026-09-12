@@ -4,7 +4,7 @@ Handles syncing virtual teams, users, budgets, keys, and chat completions.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 import httpx
 
 from app.core.config import settings
@@ -28,36 +28,45 @@ class LiteLLMClient:
         max_budget: float,
         rpm_limit: int,
         tpm_limit: int,
-        org_id: str,
+        org_id: Optional[str] = None,
+        models: Optional[List[str]] = None,
     ) -> Optional[Dict[str, Any]]:
         url = f"{self.base_url}/team/new"
         payload = {
             "team_id": litellm_team_id,
             "team_alias": team_alias,
             "max_budget": max_budget,
-            "budget_duration": "30d",
-            "rpm_limit": rpm_limit,
             "tpm_limit": tpm_limit,
-            "metadata": {"organizationId": org_id, "source": "sovereign-control-plane"},
+            "rpm_limit": rpm_limit,
+            "models": models or ["*"],
+            "metadata": {"organizationId": org_id, "source": "sovereign-control-plane"} if org_id else {},
         }
-        return http_call(url, method="POST", data=payload, headers=self.auth_headers, timeout=3)
+        res = http_call(url, method="POST", data=payload, headers=self.auth_headers, timeout=3)
+        if not res:
+            url = f"{self.base_url}/team/update"
+            res = http_call(url, method="POST", data=payload, headers=self.auth_headers, timeout=3)
+        return res
 
     def update_team(
         self,
         litellm_team_id: str,
-        team_alias: str,
-        max_budget: float,
-        rpm_limit: int,
-        tpm_limit: int,
+        team_alias: Optional[str] = None,
+        max_budget: Optional[float] = None,
+        rpm_limit: Optional[int] = None,
+        tpm_limit: Optional[int] = None,
     ) -> Optional[Dict[str, Any]]:
         url = f"{self.base_url}/team/update"
-        payload = {
+        payload: Dict[str, Any] = {
             "team_id": litellm_team_id,
-            "team_alias": team_alias,
-            "max_budget": max_budget,
-            "rpm_limit": rpm_limit,
-            "tpm_limit": tpm_limit,
         }
+        if team_alias is not None:
+            payload["team_alias"] = team_alias
+        if max_budget is not None:
+            payload["max_budget"] = max_budget
+        if tpm_limit is not None:
+            payload["tpm_limit"] = tpm_limit
+        if rpm_limit is not None:
+            payload["rpm_limit"] = rpm_limit
         return http_call(url, method="POST", data=payload, headers=self.auth_headers, timeout=3)
 
     def delete_teams(self, team_ids: List[str]) -> Optional[Dict[str, Any]]:
@@ -71,7 +80,7 @@ class LiteLLMClient:
         litellm_team_id: Optional[str],
         token_limit: int,
         role: str,
-    ):
+    ) -> Tuple[bool, Optional[str]]:
         try:
             user_role = "proxy_admin" if role == "super_admin" else "internal_user"
             budget_float = float(token_limit)
@@ -85,8 +94,13 @@ class LiteLLMClient:
                 "teams": [litellm_team_id] if litellm_team_id else [],
             }
             res = http_call(f"{self.base_url}/user/new", method="POST", data=payload, headers=self.auth_headers, timeout=3)
-            if not res:
-                http_call(f"{self.base_url}/user/update", method="POST", data=payload, headers=self.auth_headers, timeout=3)
+            if res is None:
+                res = http_call(f"{self.base_url}/user/update", method="POST", data=payload, headers=self.auth_headers, timeout=3)
+
+            if res is None:
+                err_msg = f"LiteLLM user creation/update failed at {self.base_url}/user/new"
+                logger.warning(f"Failed to sync user {user_id} with LiteLLM: {err_msg}")
+                return False, err_msg
 
             # 2. Update all Virtual Keys belonging to this user
             user_info = http_call(f"{self.base_url}/user/info?user_id={user_id}", method="GET", headers=self.auth_headers, timeout=3)
@@ -116,17 +130,23 @@ class LiteLLMClient:
                 http_call(f"{self.base_url}/team/member_add", method="POST", data=member_payload, headers=self.auth_headers, timeout=3)
 
             logger.info(f"Synchronized user {user_id} ({email}) with LiteLLM (Team: {litellm_team_id}, User Budget: {token_limit})")
+            return True, None
         except Exception as e:
-            logger.warning(f"Failed to sync user {user_id} with LiteLLM: {e}")
+            err_msg = str(e)
+            logger.warning(f"Failed to sync user {user_id} with LiteLLM: {err_msg}")
+            return False, err_msg
 
-    def delete_user(self, user_id: str, litellm_team_id: Optional[str] = None):
+    def delete_user(self, user_id: str, litellm_team_id: Optional[str] = None) -> Tuple[bool, Optional[str]]:
         try:
-            http_call(f"{self.base_url}/user/delete", method="POST", data={"user_ids": [user_id]}, headers=self.auth_headers, timeout=3)
+            res = http_call(f"{self.base_url}/user/delete", method="POST", data={"user_ids": [user_id]}, headers=self.auth_headers, timeout=3)
             if litellm_team_id:
                 http_call(f"{self.base_url}/team/member_delete", method="POST", data={"team_id": litellm_team_id, "user_id": user_id}, headers=self.auth_headers, timeout=3)
             logger.info(f"Deleted user {user_id} from LiteLLM")
+            return (True, None) if res is not None else (False, "LiteLLM user delete failed")
         except Exception as e:
-            logger.warning(f"Failed to delete user {user_id} from LiteLLM: {e}")
+            err_msg = str(e)
+            logger.warning(f"Failed to delete user {user_id} from LiteLLM: {err_msg}")
+            return False, err_msg
 
     def chat_completion(
         self,

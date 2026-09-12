@@ -362,17 +362,6 @@ export function ChatRail({
         {!collapsed && (
           <ul className="space-y-1 mb-2">
             <li>
-              <a
-                href="https://docs.sovereign-ai.local/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface text-[13px] hover:bg-surface-raised/40 rounded-2xl transition-colors decorative-font"
-              >
-                <BookOpen className="size-4 text-brand-cyan" />
-                <span>{t.account.documentation}</span>
-              </a>
-            </li>
-            <li>
               <Link
                 href={appPath("admin")}
                 className="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:text-on-surface text-[13px] hover:bg-surface-raised/40 rounded-2xl transition-colors decorative-font"

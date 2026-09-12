@@ -35,5 +35,5 @@ embedding:
   document_prefix: null
 
   preprocessing:
-    normalization_version: fa-norm-v1
+    normalization_version: fa-norm-v2
     digit_mode: preserve

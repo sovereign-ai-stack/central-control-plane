@@ -379,15 +379,29 @@ export function Thread({
 
                       {/* Assistant Bubble */}
                       <div
-                        onClick={() => onSelectMessage?.(message.id)}
-                        onMouseEnter={() => onHoverMessage?.(message.id)}
+                        onClick={() => {
+                          if (message.citations && message.citations.length > 0) {
+                            onSelectMessage?.(message.id);
+                          }
+                        }}
+                        onMouseEnter={() => {
+                          if (message.citations && message.citations.length > 0) {
+                            onHoverMessage?.(message.id);
+                          }
+                        }}
                         onMouseLeave={() => onHoverMessage?.(null)}
-                        className="bg-surface-container-lowest/30 backdrop-blur-md rounded-2xl sm:rounded-3xl rounded-tl-md p-4 sm:p-6 md:p-8 w-full shadow-xl shadow-black/10 text-start relative border border-border/30 transition-all hover:border-[#31C8ED]/30 cursor-pointer"
+                        className={cn(
+                          "bg-surface-container-lowest/30 backdrop-blur-md rounded-2xl sm:rounded-3xl rounded-tl-md p-4 sm:p-6 md:p-8 w-full shadow-xl shadow-black/10 text-start relative border border-border/30 transition-all",
+                          message.citations && message.citations.length > 0
+                            ? "hover:border-[#31C8ED]/40 cursor-pointer"
+                            : "cursor-default"
+                        )}
                       >
                         {/* Completed Model Thinking Accordion */}
                         {message.reasoningContent && (
                           <details
-                            className="w-full mb-3.5 overflow-hidden rounded-2xl border border-brand-cyan/25 bg-brand-cyan/5 text-start group/think"
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full mb-3.5 overflow-hidden rounded-2xl border border-brand-cyan/25 bg-brand-cyan/5 text-start group/think cursor-default"
                           >
                             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-xs font-semibold text-brand-cyan marker:hidden [&::-webkit-details-marker]:hidden hover:bg-brand-cyan/10 transition-colors">
                               <span className="decorative-font flex items-center gap-1.5">

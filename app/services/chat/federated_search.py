@@ -4,6 +4,7 @@ Executes multi-tenant document retrieval across isolated organization shards
 and the global shared knowledge shard in Weaviate.
 """
 
+import os
 import time
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
@@ -12,7 +13,8 @@ from app.core.logging import logger
 from app.models.document import DocumentModel
 from rag import rag_service
 
-MIN_SIMILARITY_SCORE = 0.40
+MIN_SIMILARITY_SCORE = float(os.getenv("RAG_MIN_SIMILARITY_SCORE", "0.52"))
+
 
 
 class FederatedSearchService:

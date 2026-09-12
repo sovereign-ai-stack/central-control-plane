@@ -4,7 +4,7 @@ User business logic service.
 
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -92,6 +92,8 @@ class UserService:
             organization_id=target_org,
             team_id=target_team,
             is_active=True,
+            litellm_synced=False,
+            litellm_sync_error=None,
             used_tokens=0,
             token_limit=token_limit,
             created_at=now,
@@ -100,21 +102,30 @@ class UserService:
         db.commit()
         db.refresh(new_user)
 
+        UserService._sync_user_instance_to_litellm(new_user, db)
+
+        return new_user.to_dict()
+
+    @staticmethod
+    def _sync_user_instance_to_litellm(user_obj: UserModel, db: Session) -> Tuple[bool, Optional[str]]:
         litellm_team_id = None
-        if target_team:
-            team_obj = db.query(TeamModel).filter(TeamModel.id == target_team).first()
+        if user_obj.team_id:
+            team_obj = db.query(TeamModel).filter(TeamModel.id == user_obj.team_id).first()
             if team_obj:
                 litellm_team_id = team_obj.litellm_team_id or f"{team_obj.organization_id}:{team_obj.id}"
 
-        litellm_client.sync_user(
-            user_id=user_id,
-            email=email,
+        sync_ok, sync_err = litellm_client.sync_user(
+            user_id=user_obj.id,
+            email=user_obj.email,
             litellm_team_id=litellm_team_id,
-            token_limit=token_limit,
-            role=target_role,
+            token_limit=user_obj.token_limit,
+            role=user_obj.role,
         )
-
-        return new_user.to_dict()
+        user_obj.litellm_synced = sync_ok
+        user_obj.litellm_sync_error = sync_err
+        db.commit()
+        db.refresh(user_obj)
+        return sync_ok, sync_err
 
     @staticmethod
     def update_user(user_id: str, payload: UpdateUserRequest, caller: Dict[str, Any], db: Session) -> Dict[str, Any]:
@@ -154,19 +165,7 @@ class UserService:
         db.commit()
         db.refresh(target_user)
 
-        litellm_team_id = None
-        if target_user.team_id:
-            team_obj = db.query(TeamModel).filter(TeamModel.id == target_user.team_id).first()
-            if team_obj:
-                litellm_team_id = team_obj.litellm_team_id or f"{team_obj.organization_id}:{team_obj.id}"
-
-        litellm_client.sync_user(
-            user_id=target_user.id,
-            email=target_user.email,
-            litellm_team_id=litellm_team_id,
-            token_limit=target_user.token_limit,
-            role=target_user.role,
-        )
+        UserService._sync_user_instance_to_litellm(target_user, db)
 
         return target_user.to_dict()
 
@@ -195,6 +194,60 @@ class UserService:
         db.delete(target_user)
         db.commit()
         return {"deleted": True, "id": user_id}
+
+    @staticmethod
+    def sync_user_by_id(user_id: str, caller: Dict[str, Any], db: Session) -> Dict[str, Any]:
+        """Manually triggers LiteLLM synchronization for a specific user."""
+        role = caller.get("role")
+        target_user = db.query(UserModel).filter(UserModel.id == user_id).first()
+        if not target_user:
+            raise HTTPException(status_code=404, detail="کاربر یافت نشد.")
+
+        if role != "super_admin":
+            if role == "org_admin" and target_user.organization_id != caller.get("organizationId"):
+                raise HTTPException(status_code=403, detail="عدم دسترسی به کاربر سازمان دیگر.")
+            elif role == "team_admin" and target_user.team_id != caller.get("teamId"):
+                raise HTTPException(status_code=403, detail="عدم دسترسی به کاربر تیم دیگر.")
+
+        sync_ok, sync_err = UserService._sync_user_instance_to_litellm(target_user, db)
+        return {
+            "success": sync_ok,
+            "error": sync_err,
+            "user": target_user.to_dict(),
+        }
+
+    @staticmethod
+    def reconcile_all_users_with_litellm(caller: Dict[str, Any], db: Session) -> Dict[str, Any]:
+        """
+        Reconciles users with LiteLLM proxy, retrying unsynced/all users to prevent silent drift.
+        """
+        role = caller.get("role")
+        if role not in ["super_admin", "org_admin"]:
+            raise HTTPException(status_code=403, detail="تنها مدیران سامانه مجاز به بازهمگام‌سازی کاربران هستند.")
+
+        query = db.query(UserModel)
+        if role == "org_admin":
+            query = query.filter(UserModel.organization_id == caller.get("organizationId"))
+
+        users = query.all()
+        synced_count = 0
+        failed_count = 0
+        errors = []
+
+        for u in users:
+            sync_ok, sync_err = UserService._sync_user_instance_to_litellm(u, db)
+            if sync_ok:
+                synced_count += 1
+            else:
+                failed_count += 1
+                errors.append({"userId": u.id, "email": u.email, "error": sync_err})
+
+        return {
+            "totalUsers": len(users),
+            "syncedUsers": synced_count,
+            "failedUsers": failed_count,
+            "errors": errors,
+        }
 
 
 user_service = UserService()

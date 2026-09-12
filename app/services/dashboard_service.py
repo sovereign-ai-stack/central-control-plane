@@ -12,6 +12,7 @@ from app.integrations.registry import registry_client
 from app.models.organization import OrganizationModel
 from app.models.team import TeamModel
 from app.models.user import UserModel
+from app.services.organization_service import OrganizationService
 
 
 class DashboardService:
@@ -37,8 +38,7 @@ class DashboardService:
             teams = db.query(TeamModel).filter(TeamModel.organization_id == user_org_id).all()
             total_teams = len(teams)
             total_users = db.query(UserModel).filter(UserModel.organization_id == user_org_id).count()
-            org_users = db.query(UserModel).filter(UserModel.organization_id == user_org_id).all()
-            total_tokens = sum(u.used_tokens for u in org_users)
+            total_tokens = OrganizationService.get_organization_used_tokens(db, user_org_id)
             org_obj = db.query(OrganizationModel).filter(OrganizationModel.id == user_org_id).first()
             token_limit = org_obj.token_limit if org_obj else 5000000
         else:
@@ -157,7 +157,7 @@ class DashboardService:
         if user_org_id:
             org_obj = db.query(OrganizationModel).filter(OrganizationModel.id == user_org_id).first()
             if org_obj:
-                org_used = sum(t.used_tokens for t in org_obj.teams) if org_obj.teams else 0
+                org_used = OrganizationService.get_organization_used_tokens(db, user_org_id)
                 org_limit = org_obj.token_limit
                 org_name = org_obj.name
 

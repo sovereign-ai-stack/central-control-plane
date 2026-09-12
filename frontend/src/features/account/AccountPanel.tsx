@@ -66,9 +66,9 @@ export function AccountPanel({
           {isFa ? "تنظیمات سامانه و حساب کاربری" : "System Settings & Account"}
         </DialogTitle>
 
-        <div className="flex flex-col h-[520px]">
+        <div className="flex flex-col h-[560px] max-h-[85vh]">
           {/* MODAL HEADER */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border/30 bg-surface-container/20">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/30 bg-surface-container/20 shrink-0">
             <div className="flex items-center gap-2.5">
               <BrandLogoIcon className="size-6" />
               <div className="text-sm font-bold text-on-surface">
@@ -78,9 +78,9 @@ export function AccountPanel({
           </div>
 
           {/* TAB BAR & CONTENT */}
-          <div className="flex flex-1 overflow-hidden">
-            {/* TABS SIDEBAR */}
-            <div className="w-48 shrink-0 bg-surface-container/20 border-e border-border/30 p-2.5 space-y-1">
+          <div className="flex flex-col sm:flex-row flex-1 overflow-hidden">
+            {/* TABS SIDEBAR (horizontal scroll on mobile, vertical list on sm+) */}
+            <div className="w-full sm:w-48 shrink-0 bg-surface-container/20 border-b sm:border-b-0 sm:border-e border-border/30 p-2 sm:p-2.5 flex sm:flex-col gap-1 overflow-x-auto sm:overflow-x-visible">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -88,26 +88,26 @@ export function AccountPanel({
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    className={`shrink-0 sm:w-full flex items-center gap-2 sm:gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                       isActive
                         ? "bg-brand-cyan/15 text-brand-cyan border border-brand-cyan/30 shadow-sm"
-                        : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40"
+                        : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container/40 border border-transparent"
                     }`}
                   >
                     <Icon className={`size-4 ${isActive ? "text-brand-cyan" : "text-on-surface-variant"}`} />
-                    <span>{tab.label}</span>
+                    <span className="whitespace-nowrap">{tab.label}</span>
                   </button>
                 );
               })}
             </div>
 
             {/* TAB CONTENT AREA */}
-            <div className="flex-1 overflow-y-auto p-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5">
               {activeTab === "general" && (
                 <GeneralTab language={language} onLanguageChange={onLanguageChange} />
               )}
               {/* {activeTab === "voice" && <VoiceTab language={language} />} */}
-              {activeTab === "usage" && <UsageTab language={language} />}
+              {activeTab === "usage" && <UsageTab language={language} user={user} />}
               {/* {activeTab === "mcp" && <McpKeysTab language={language} />} */}
               {activeTab === "account" && (
                 <AccountTab user={user} language={language} onLogout={onLogout} />

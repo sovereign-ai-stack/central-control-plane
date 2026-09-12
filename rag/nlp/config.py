@@ -9,6 +9,7 @@ improvements and morphological reduction carry very different risk.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -104,9 +105,16 @@ def _from_mapping(block: dict[str, Any]) -> NlpConfig:
     if morphology.min_stem_length < 1:
         raise NlpConfigurationError("min_stem_length must be at least 1")
 
+    env_enabled = os.getenv("RAG_NLP_ENABLED")
+    if env_enabled is not None:
+        is_enabled = env_enabled.lower() in ("true", "1", "yes")
+    else:
+        is_enabled = bool(block.get("enabled", False))
+
     return NlpConfig(
-        enabled=bool(block.get("enabled", False)),
+        enabled=is_enabled,
         normalization_version=version,
         fold_digits=bool(block.get("fold_digits", False)),
         morphology=morphology,
     )
+

@@ -20,6 +20,8 @@ class UserModel(Base):
     organization_id = Column(String(64), ForeignKey("sov_organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(String(64), ForeignKey("sov_teams.id", ondelete="SET NULL"), nullable=True, index=True)
     is_active = Column(Boolean, default=True)
+    litellm_synced = Column(Boolean, default=False)
+    litellm_sync_error = Column(String(500), nullable=True)
     used_tokens = Column(BigInteger, default=0)
     token_limit = Column(BigInteger, default=500000)
     created_at = Column(String(64), nullable=False)
@@ -39,6 +41,8 @@ class UserModel(Base):
             "teamId": self.team_id,
             "teamName": self.team.name if self.team else "",
             "isActive": self.is_active,
+            "litellmSynced": bool(self.litellm_synced),
+            "litellmSyncError": self.litellm_sync_error,
             "usedTokens": self.used_tokens,
             "tokenLimit": self.token_limit,
             "usedPercent": used_pct,

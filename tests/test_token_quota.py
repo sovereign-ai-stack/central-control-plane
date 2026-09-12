@@ -125,7 +125,7 @@ def test_org_quota_exhaustion(client):
     db = TestingSessionLocal()
     now = datetime.now(timezone.utc).isoformat()
     
-    # Create Org with tiny limit (100 tokens), team using 100 tokens
+    # Create Org with tiny limit (100 tokens), user having consumed 100 tokens
     org = OrganizationModel(
         id="org_quota_exhausted_test",
         name="سازمان بدون سهمیه",
@@ -138,7 +138,7 @@ def test_org_quota_exhaustion(client):
         organization_id="org_quota_exhausted_test",
         name="تیم ۱",
         token_limit=1000,
-        used_tokens=100,  # Team used 100 which equals org limit 100
+        used_tokens=0,
         created_at=now,
     )
     user = UserModel(
@@ -150,7 +150,7 @@ def test_org_quota_exhaustion(client):
         organization_id="org_quota_exhausted_test",
         team_id="team_under_exhausted_org",
         is_active=True,
-        used_tokens=0,
+        used_tokens=100,  # User used 100 which equals org limit 100
         token_limit=50000,
         created_at=now,
     )
@@ -174,3 +174,60 @@ def test_org_quota_exhaustion(client):
     assert res.status_code == 200
     assert "quota_exceeded" in res.text
     assert "اتمام سهمیه توکن سازمان" in res.text or "Organization Quota Exceeded" in res.text
+
+
+def test_org_quota_consistency_without_team(client, auth_headers):
+    """
+    Verifies that a user in an organization without a team (team_id=None)
+    has their token consumption uniformly reflected in:
+    1. Quota enforcement gate
+    2. Organization detail & list
+    3. Admin limits panel & dashboard
+    """
+    db = TestingSessionLocal()
+    now = datetime.now(timezone.utc).isoformat()
+
+    org_id = "org_no_team_test"
+    org = OrganizationModel(
+        id=org_id,
+        name="سازمان بدون تیم",
+        code="ONT",
+        token_limit=500,
+        created_at=now,
+    )
+    user_noteam = UserModel(
+        id="u_noteam_user",
+        email="noteam_user@test.local",
+        name="کاربر بدون تیم",
+        password="password",
+        role="org_admin",
+        organization_id=org_id,
+        team_id=None,
+        is_active=True,
+        used_tokens=300,
+        token_limit=50000,
+        created_at=now,
+    )
+    db.add(org)
+    db.add(user_noteam)
+    db.commit()
+    db.close()
+
+    # 1. Check organization list / detail
+    res_org = client.get(f"/api/admin/organizations/{org_id}", headers=auth_headers)
+    assert res_org.status_code == 200
+    assert res_org.json()["organization"]["usedTokens"] == 300
+
+    # 2. Login as user and check limits
+    login_res = client.post("/api/auth/login", json={"email": "noteam_user@test.local", "password": "password"})
+    assert login_res.status_code == 200
+    user_headers = {"Authorization": f"Bearer {login_res.json()['token']}"}
+
+    res_limits = client.get("/api/admin/limits", headers=user_headers)
+    assert res_limits.status_code == 200
+    assert res_limits.json()["userTokensUsed"] == 300
+
+    # 3. Check dashboard for org_admin
+    res_dash = client.get("/api/admin/dashboard", headers=user_headers)
+    assert res_dash.status_code == 200
+    assert res_dash.json()["tokensThisMonth"] == 300
