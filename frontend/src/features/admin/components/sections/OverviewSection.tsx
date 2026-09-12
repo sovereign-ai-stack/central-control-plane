@@ -42,7 +42,7 @@ export function OverviewSection({
   const totalUsers = dashboard?.totalUsers ?? users.length;
   const totalOrgs = dashboard?.totalOrganizations ?? Math.max(1, organizations.length);
   const totalTeams = dashboard?.totalTeams ?? Math.max(1, teams.length);
-  const totalDocs = dashboard?.totalDocuments ?? documents.length;
+  const totalDocs = documents.length;
   const tokensUsed = dashboard?.tokensThisMonth ?? 0;
   const tokenLimit = dashboard?.workspaceTokenLimit ?? 20000000;
   const usedPercent = dashboard?.tokenUsagePercent ?? Math.min(100, Math.round((tokensUsed / Math.max(1, tokenLimit)) * 100));
