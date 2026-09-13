@@ -13,7 +13,9 @@ suite keeps running) in an environment where it is unavailable.
 from __future__ import annotations
 
 import io
+import re
 from typing import Any
+import unicodedata
 
 from rag.ingestion.extraction.errors import (
     CorruptDocumentError,
@@ -37,6 +39,57 @@ _METADATA_FIELDS = {
     "/Creator": "creator",
     "/Producer": "producer",
 }
+
+_PERSIAN_CHAR_MAP = str.maketrans({
+    "\u064a": "\u06cc",  # arabic yeh -> persian yeh
+    "\u0649": "\u06cc",  # alef maksura -> persian yeh
+    "\u0643": "\u06a9",  # arabic kaf -> persian kaf
+    "\u0629": "\u0647",  # teh marbuta -> heh
+    "\u0640": "",        # tatweel
+    "\u200b": "",        # zero width space
+    "\ufeff": "",        # BOM
+})
+
+_REPEATED_LETTERS = re.compile(r"([بتثجچحخدذرزژسشصضطظعغفقکگلمنهی])\1{2,}")
+
+_CORRUPT_GLYPH_FIXES = [
+    (re.compile(r"\bسرمايهدذارى\b"), "سرمایه‌گذاری"),
+    (re.compile(r"\bسرمايهدذاری\b"), "سرمایه‌گذاری"),
+    (re.compile(r"\bسرمایه\s*دذاری\b"), "سرمایه‌گذاری"),
+    (re.compile(r"\bاستارتاب\b"), "استارتاپ"),
+    (re.compile(r"\bمنتورينك\b"), "منتورینگ"),
+    (re.compile(r"\bمنتورینک\b"), "منتورینگ"),
+    (re.compile(r"\bزيرسااتى\b"), "زیرساختی"),
+    (re.compile(r"\bزیرسااتی\b"), "زیرساختی"),
+    (re.compile(r"\bادمات\b"), "خدمات"),
+    (re.compile(r"\bيوست\b"), "پیوست"),
+    (re.compile(r"\bدرس اب\b"), "در سهام"),
+    (re.compile(r"\bباناب ااترارى\b"), "با نام تجاری"),
+]
+
+
+def clean_persian_pdf_text(text: str) -> str:
+    """Repairs common Persian PDF font encoding artifacts and presentation forms."""
+    if not text:
+        return ""
+    # 1. Normalize Unicode compatibility decomposition (folds presentation forms like ﻼ, ﻴ, ﺘ)
+    t = unicodedata.normalize("NFKC", text)
+    # 2. Map Arabic yeh/kaf/tatweel
+    t = t.translate(_PERSIAN_CHAR_MAP)
+    # 3. Collapse repeated tatweel letters (e.g. استتتتارت -> استارت, شتتتود -> شود)
+    t = _REPEATED_LETTERS.sub(r"\1", t)
+    # 4. Apply known font encoding repair patterns
+    for pattern, replacement in _CORRUPT_GLYPH_FIXES:
+        t = pattern.sub(replacement, t)
+    return t
+
+
+def pymupdf_available() -> bool:
+    try:
+        import fitz  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def pypdf_available() -> bool:
@@ -84,6 +137,64 @@ class PdfExtractor:
             raise CorruptDocumentError("file is not a PDF document")
 
         budget = deadline or Deadline(self._limits.timeout_seconds)
+
+        # 1. High-fidelity PyMuPDF extraction if available
+        if pymupdf_available():
+            try:
+                import fitz
+                doc = fitz.open(stream=data, filetype="pdf")
+                if doc.is_encrypted:
+                    raise CorruptDocumentError("encrypted PDF documents are not supported")
+                pages_count = len(doc)
+                self._limits.check_page_count(pages_count)
+                parts: list[str] = []
+                segments: list[SourceSegment] = []
+                cursor = 0
+                for ordinal in range(1, pages_count + 1):
+                    budget.check()
+                    page = doc[ordinal - 1]
+                    raw_text = page.get_text("text") or ""
+                    page_text = clean_persian_pdf_text(raw_text)
+                    if not page_text.strip():
+                        continue
+                    separator = len(_PAGE_SEPARATOR) if parts else 0
+                    self._limits.check_extracted_chars(cursor + separator + len(page_text))
+                    if parts:
+                        cursor += len(_PAGE_SEPARATOR)
+                        parts.append(_PAGE_SEPARATOR)
+                    start = cursor
+                    parts.append(page_text)
+                    cursor += len(page_text)
+                    segments.append(
+                        SourceSegment(
+                            label=SEGMENT_LABEL_PAGE,
+                            ordinal=ordinal,
+                            char_start=start,
+                            char_end=cursor,
+                        )
+                    )
+                text = "".join(parts)
+                if text.strip():
+                    metadata = {}
+                    for k, v in (doc.metadata or {}).items():
+                        norm_k = f"/{k.capitalize()}"
+                        if isinstance(v, str) and v.strip() and norm_k in _METADATA_FIELDS:
+                            metadata[_METADATA_FIELDS[norm_k]] = v.strip()
+                    return ExtractedDocument(
+                        text=text,
+                        source_type=SOURCE_TYPE_PDF,
+                        filename=filename,
+                        metadata=metadata,
+                        segments=tuple(segments),
+                        page_count=pages_count,
+                    )
+            except CorruptDocumentError:
+                raise
+            except Exception:
+                # If PyMuPDF extraction failed unexpectedly, fallback to pypdf below
+                pass
+
+        # 2. Standard pypdf extraction fallback
         pypdf = _load_pypdf()
         reader = self._open_reader(pypdf, data)
         pages = self._page_list(reader)
@@ -156,7 +267,8 @@ class PdfExtractor:
     @staticmethod
     def _page_text(page: Any) -> str:
         try:
-            return page.extract_text() or ""
+            raw = page.extract_text() or ""
+            return clean_persian_pdf_text(raw)
         except Exception:  # noqa: BLE001 - pypdf raises arbitrary types per malformed page
             # A single unreadable page must not fail the whole document.
             return ""

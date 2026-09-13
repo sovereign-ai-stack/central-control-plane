@@ -10,6 +10,7 @@ psycopg2-binary>=2.9.9
 numpy>=1.26.0
 pyyaml>=6.0
 pypdf>=4.0.0
+pymupdf>=1.24.0
 weaviate-client>=4.23,<5
 sentence-transformers>=3.0.0
 langfuse>=2.50.0,<3.0.0

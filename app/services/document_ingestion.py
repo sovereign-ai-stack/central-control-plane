@@ -74,17 +74,35 @@ def process_document_ingestion_task(
             page_count = max(1, len(extracted_text) // 2000 + 1)
         elif lower_name.endswith(".pdf") or "pdf" in content_type.lower():
             try:
-                import pypdf
-                reader = pypdf.PdfReader(io.BytesIO(content))
-                page_count = max(1, len(reader.pages))
-                extracted_pages = []
-                for i, p in enumerate(reader.pages):
-                    txt = p.extract_text() or ""
-                    if txt.strip():
-                        extracted_pages.append(f"--- [صفحه {i+1}] ---\n{txt}")
-                extracted_text = "\n\n".join(extracted_pages)
+                from rag.ingestion.extraction.pdf import clean_persian_pdf_text, pymupdf_available
+                if pymupdf_available():
+                    try:
+                        import fitz
+                        doc = fitz.open(stream=content, filetype="pdf")
+                        page_count = max(1, len(doc))
+                        extracted_pages = []
+                        for i in range(page_count):
+                            raw_txt = doc[i].get_text("text") or ""
+                            txt = clean_persian_pdf_text(raw_txt)
+                            if txt.strip():
+                                extracted_pages.append(f"--- [صفحه {i+1}] ---\n{txt}")
+                        extracted_text = "\n\n".join(extracted_pages)
+                    except Exception as fe:
+                        logger.warning(f"PyMuPDF extraction notice for {filename}: {fe}")
+
+                if not extracted_text:
+                    import pypdf
+                    reader = pypdf.PdfReader(io.BytesIO(content))
+                    page_count = max(1, len(reader.pages))
+                    extracted_pages = []
+                    for i, p in enumerate(reader.pages):
+                        raw_txt = p.extract_text() or ""
+                        txt = clean_persian_pdf_text(raw_txt)
+                        if txt.strip():
+                            extracted_pages.append(f"--- [صفحه {i+1}] ---\n{txt}")
+                    extracted_text = "\n\n".join(extracted_pages)
             except Exception as e:
-                logger.warning(f"pypdf extraction notice for {filename}: {e}")
+                logger.warning(f"PDF extraction notice for {filename}: {e}")
                 extracted_text = extract_plain_text(content)
                 page_count = max(1, len(content) // 40000 + 1)
         else:
