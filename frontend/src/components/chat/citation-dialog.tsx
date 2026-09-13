@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Citation, Language } from "@/lib/types";
+import { copyToClipboard } from "@/lib/utils";
+import { toast } from "sonner";
 
 export interface CitationDialogProps {
   citation: Citation | null;
@@ -27,10 +29,15 @@ export function CitationDialog({
   const isFa = language === "fa";
   const snippetText = citation.snippet || citation.excerpt || (isFa ? "متن قطعه استناد شده در دسترس است." : "Referenced snippet available.");
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(snippetText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    const success = await copyToClipboard(snippetText);
+    if (success) {
+      setCopied(true);
+      toast.success(isFa ? "متن استناد در کلیپ‌بورد کپی شد." : "Snippet copied to clipboard.");
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      toast.error(isFa ? "امکان کپی متن وجود نداشت." : "Failed to copy text.");
+    }
   };
 
   return (
