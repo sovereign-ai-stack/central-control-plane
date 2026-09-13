@@ -41,6 +41,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Generate Prisma client
 RUN python -c "import litellm, os; p=os.path.join(os.path.dirname(litellm.__file__), 'proxy', 'schema.prisma'); os.system(f'prisma generate --schema {p}')"
 
+# Copy entrypoint (auto master-key seeding on every startup)
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 EXPOSE 4000
 
-ENTRYPOINT ["litellm"]
+ENTRYPOINT ["/bin/bash", "/app/entrypoint.sh"]

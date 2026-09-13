@@ -30,6 +30,8 @@ services:
   litellm:
     build: ./litellm
     container_name: litellm-proxy
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -40,45 +42,65 @@ services:
     volumes:
       - ./litellm/config.yaml:/app/config.yaml
     environment:
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY must be set in .env}
       DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
+      # FIX(prisma-race): Prisma نیاز به DIRECT_URL داره تا race condition موقع
+      # startup برطرف بشه ('Prisma' object has no attribute '_Prisma__engine')
+      DIRECT_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       LITELLM_LOG: ${LITELLM_LOG:-INFO}
       STORE_MODEL_IN_DB: "True"
+      # ───────────────────────────────────────────────────────────────────────
+      # FIX(401): در حالت DB-backed auth، master_key باید در VerificationTokenTable
+      # وجود داشته باشه. با LITELLM_MASTER_KEY_HASH="" مجبور می‌شه هر بار
+      # از env بخونه و در DB seed کنه (از 401 بعد از restart جلوگیری می‌کنه).
+      # ───────────────────────────────────────────────────────────────────────
+      LITELLM_MASTER_KEY_HASH: ""
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-pk-lf-master}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-sk-lf-master}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
-    command: ["--config", "/app/config.yaml", "--host", "0.0.0.0", "--port", "4000", "--num_workers", "1"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:4000/health/readiness || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
     restart: unless-stopped
 
   # 4. Central Node Registry (Auto-Registration & Dynamic Node Health Tracking)
   registry:
     build: ./registry
     container_name: central-node-registry
+    env_file:
+      - .env
     ports:
       - "${REGISTRY_PORT:-8200}:8200"
     environment:
       LITELLM_URL: http://litellm:4000
-      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY must be set in .env}
       REGISTRY_SECRET: ${REGISTRY_SECRET:-}
       NODE_TIMEOUT_SECONDS: ${NODE_TIMEOUT_SECONDS:-60}
     depends_on:
-      - litellm
+      litellm:
+        condition: service_healthy
     restart: unless-stopped
 
   # 5. Semantic Router (Intent Classifier & Smart Request Dispatcher)
   semantic:
     build: ./semantic
     container_name: semantic-router
+    env_file:
+      - .env
     ports:
       - "127.0.0.1:${SEMANTIC_PORT:-8300}:8300"
     environment:
       LLM_GATEWAY_URL: http://litellm:4000
-      LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:-sk-lite-master-1234}
+      LLM_GATEWAY_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY must be set in .env}
       DEFAULT_MODEL: ${DEFAULT_MODEL:-general-model}
     depends_on:
-      - litellm
+      litellm:
+        condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -89,14 +111,18 @@ services:
       context: .
       dockerfile: Dockerfile.gateway
     container_name: central-ai-gateway
+    env_file:
+      - .env
     ports:
       - "${GATEWAY_PORT:-8000}:8000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-litellm}:${POSTGRES_PASSWORD:-litellm_secure_password}@postgres:5432/${POSTGRES_DB:-litellm}
       LITELLM_URL: http://litellm:4000
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?LITELLM_MASTER_KEY must be set in .env}
       REGISTRY_URL: http://registry:8200
       REGISTRY_SECRET: ${REGISTRY_SECRET:-}
       SEMANTIC_URL: http://semantic:8300
+      RAG_MIN_SIMILARITY_SCORE: ${RAG_MIN_SIMILARITY_SCORE:-0.52}
       RAG_VECTOR_STORE_BACKEND: ${RAG_VECTOR_STORE_BACKEND:-weaviate}
       RAG_WEAVIATE_URL: http://weaviate:8080
       RAG_WEAVIATE_GRPC_PORT: 50051
@@ -121,11 +147,12 @@ services:
       - ./app:/app/app
       - ./rag:/app/rag
       - ./server.py:/app/server.py
+      - ./.env:/app/.env:ro
     depends_on:
       postgres:
         condition: service_healthy
       litellm:
-        condition: service_started
+        condition: service_healthy
       registry:
         condition: service_started
       semantic:
