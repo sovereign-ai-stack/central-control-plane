@@ -79,12 +79,12 @@ class ChatOfflineFallback:
         if has_citations:
             return (
                 "📚 **اسناد مرتبط در پایگاه دانش سازمانی (RAG) یافت و استخراج شدند:**\n\n"
-                "اطلاعات مورد نظر شما از اسناد سازمانی استخراج گردید (به بخش **«منابع ارجاع داده شده»** در ستون سمت چپ مراجعه فرمایید).\n\n"
+                "اطلاعات مورد نظر شما از اسناد سازمانی استخراج گردید (به بخش **«منابع ارجاع داده شده»** مراجعه فرمایید).\n\n"
                 "---\n\n"
-                "⚠️ **وضعیت کلاستر هوش مصنوعی:** ارتباط با موتور استنتاج مدل زبانی محلی (LiteLLM یا کارت گرافیک) برقرار نشد."
+                "⚠️ **وضعیت کلاستر هوش مصنوعی:** در حال حاضر هیچ مدلی برای پردازش درخواست شما و خواندن اسناد فعال یا حاضر نیست."
                 if is_fa else
-                "📚 **Relevant documents found in enterprise knowledge base.** (See cited sources in left panel)\n\n---\n\n"
-                "⚠️ **Cluster Status:** Unable to establish communication with local LLM inference engine."
+                "📚 **Relevant documents found in enterprise knowledge base.** (See cited sources)\n\n---\n\n"
+                "⚠️ **Cluster Status:** No model is currently active or ready to process your request and read the documents."
             )
         else:
             return (

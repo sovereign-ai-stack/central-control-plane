@@ -19,6 +19,30 @@ from app.db.init_db import init_db
 async def lifespan(app: FastAPI):
     logger.info("Initializing persistent database schema...")
     init_db()
+
+    # Reconcile managed models with LiteLLM in background (non-blocking)
+    import threading
+    def _bg_model_reconcile():
+        import time
+        time.sleep(5)  # صبر کن Gateway کاملاً بالا بیاد
+        try:
+            from app.db.session import SessionLocal
+            from app.services.managed_model_service import ManagedModelService
+            bg_db = SessionLocal()
+            try:
+                result = ManagedModelService.reconcile_all_models_with_litellm(bg_db)
+                synced = result.get("active", 0)
+                total = synced + result.get("purged", 0)
+                if total > 0:
+                    logger.info(f"✅ Model reconciliation: {synced}/{total} models synced to LiteLLM")
+                else:
+                    logger.info("ℹ️  No managed models found in DB to sync (normal on first run)")
+            finally:
+                bg_db.close()
+        except Exception as e:
+            logger.warning(f"⚠️  Background model reconciliation failed (non-critical): {e}")
+
+    threading.Thread(target=_bg_model_reconcile, daemon=True).start()
     yield
 
 
