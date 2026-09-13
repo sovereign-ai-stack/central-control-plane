@@ -29,17 +29,18 @@ def test_file_upload_db_delete_orphan_free():
     assert doc.organization_id == "org_lifecycle"
     assert doc.extracted_text == doc_content
     
-    # Manually trigger RAG ingestion to test vector indexing
-    rag_res = rag_service.ingest_document(
-        content=doc_content,
-        organization_id="org_lifecycle",
-        team_id="team_lifecycle",
-        title=doc.name,
-        source=doc.name,
-        document_id=doc_id,
-        user_id="u_admin",
-    )
-    assert rag_res["chunk_count"] >= 1
+    import time
+    # Wait for background task to complete indexing
+    status = doc.status
+    for _ in range(30):
+        db.expire_all()
+        fresh_doc = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
+        if fresh_doc and fresh_doc.status in ("indexed", "failed"):
+            status = fresh_doc.status
+            break
+        time.sleep(0.5)
+
+    assert status == "indexed"
     
     # Verify retrieval finds it
     retrieved = rag_service.retrieve(

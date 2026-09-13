@@ -243,17 +243,33 @@ class SentenceTransformersBackend:
         extra_kwargs = dict(cls._sentence_transformer_kwargs(config))
         if "trust_remote_code" not in extra_kwargs:
             extra_kwargs["trust_remote_code"] = True
+        if "model_kwargs" not in extra_kwargs:
+            extra_kwargs["model_kwargs"] = {"low_cpu_mem_usage": False}
 
         def _instantiate():
             if is_local_dir:
+                try:
+                    return SentenceTransformer(target_model)
+                except Exception:
+                    pass
+                for dev in (device, None):
+                    try:
+                        return SentenceTransformer(
+                            target_model,
+                            device=dev,
+                            local_files_only=True,
+                            **extra_kwargs,
+                        )
+                    except (NotImplementedError, Exception):
+                        pass
                 return SentenceTransformer(
-                    target_model,
+                    config.model_id,
                     device=device,
-                    local_files_only=True,
+                    revision=config.revision,
                     **extra_kwargs,
                 )
             return SentenceTransformer(
-                target_model,
+                config.model_id,
                 device=device,
                 revision=config.revision,
                 **extra_kwargs,

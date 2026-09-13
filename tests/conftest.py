@@ -58,6 +58,8 @@ def override_get_db():
         db.close()
 
 
+import app.db.session as app_db_session
+app_db_session.SessionLocal = TestingSessionLocal
 app.dependency_overrides[get_db] = override_get_db
 
 

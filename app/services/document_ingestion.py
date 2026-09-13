@@ -57,9 +57,9 @@ def process_document_ingestion_task(
     and persist results to the database asynchronously.
     Supports PDF, Word (.docx), Markdown (.md), and plain text (.txt).
     """
-    logger.info(f"🚀 Starting background ingestion for document '{filename}' (ID: {doc_id}, size: {len(content)} bytes)...")
     owns_session = db_session is None
-    db = db_session or SessionLocal()
+    from app.db import session as db_session_module
+    db = db_session or db_session_module.SessionLocal()
     try:
         extracted_text = ""
         page_count = 1

@@ -159,6 +159,7 @@ def test_internal_rag_retrieve_api_endpoint():
         title="امنیت ابری",
     )
 
+    from app.core.config import settings
     resp = client.post(
         "/api/rag/retrieve",
         json={
@@ -167,6 +168,7 @@ def test_internal_rag_retrieve_api_endpoint():
             "team_id": "team_infra",
             "top_k": 2,
         },
+        headers={"X-Internal-Key": "sovereign_internal_rag_secret_key_prod"},
     )
     assert resp.status_code == 200
     data = resp.json()

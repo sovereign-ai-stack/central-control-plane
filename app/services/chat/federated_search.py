@@ -13,7 +13,7 @@ from app.core.logging import logger
 from app.models.document import DocumentModel
 from rag import rag_service
 
-MIN_SIMILARITY_SCORE = float(os.getenv("RAG_MIN_SIMILARITY_SCORE", "0.38"))
+MIN_SIMILARITY_SCORE = float(os.getenv("RAG_MIN_SIMILARITY_SCORE", "0.52"))
 
 
 
@@ -52,11 +52,21 @@ class FederatedSearchService:
         # 2. Search target organizations
         for org_id in org_targets:
             try:
+                target_teams = list(allowed_teams)
+                if is_super:
+                    try:
+                        doc_teams = db.query(DocumentModel.team_id).filter(DocumentModel.organization_id == org_id).distinct().all()
+                        for (d_team,) in doc_teams:
+                            if d_team and d_team not in target_teams:
+                                target_teams.append(d_team)
+                    except Exception as te:
+                        logger.debug(f"Error querying teams for org {org_id}: {te}")
+
                 chunks_org = rag_service.retrieve(
                     query=search_text,
                     organization_id=org_id,
                     team_id=user_team if not is_super else None,
-                    allowed_team_ids=allowed_teams if not is_super else None,
+                    allowed_team_ids=target_teams,
                     user_id=user_id,
                     top_k=4,
                 )
@@ -80,11 +90,23 @@ class FederatedSearchService:
 
         # 3. Global Shared Knowledge Shard
         try:
+            global_teams = ["global"]
+            if is_super:
+                try:
+                    doc_teams = db.query(DocumentModel.team_id).filter(
+                        (DocumentModel.organization_id == "global") | (DocumentModel.organization_id == None)
+                    ).distinct().all()
+                    for (d_team,) in doc_teams:
+                        if d_team and d_team not in global_teams:
+                            global_teams.append(d_team)
+                except Exception as gte:
+                    logger.debug(f"Error querying global teams: {gte}")
+
             chunks_global = rag_service.retrieve(
                 query=search_text,
                 organization_id="global",
                 team_id="global",
-                allowed_team_ids=["global"],
+                allowed_team_ids=global_teams,
                 user_id=user_id,
                 top_k=4,
             )

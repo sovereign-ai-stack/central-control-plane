@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from rag.embedding.errors import EmbeddingValidationError
 from rag.ingestion.persian import normalization_version, normalize_persian
-from rag.nlp.normalizer import NORMALIZATION_VERSION_V2
+from rag.nlp.normalizer import NORMALIZATION_VERSION_V2, normalize_persian_v2
 from rag.nlp.pipeline import PersianNlpPipeline
 
 
@@ -29,9 +29,7 @@ class EmbeddingPreprocessor:
         nlp: PersianNlpPipeline | None = None,
     ) -> None:
         self._nlp = nlp if (nlp is not None and nlp.config.enabled) else None
-        supported = {normalization_version()}
-        if self._nlp is not None:
-            supported.add(NORMALIZATION_VERSION_V2)
+        supported = {normalization_version(), NORMALIZATION_VERSION_V2}
         if normalization_version_name not in supported:
             raise EmbeddingValidationError(
                 f"Unsupported normalization version: {normalization_version_name}"
@@ -57,11 +55,12 @@ class EmbeddingPreprocessor:
     def preprocess(self, raw_text: str) -> str:
         if raw_text is None:
             raise EmbeddingValidationError("text is required")
-        normalized = (
-            self._nlp.embedding_text(raw_text)
-            if self._nlp is not None
-            else normalize_persian(raw_text)
-        )
+        if self._nlp is not None:
+            normalized = self._nlp.embedding_text(raw_text)
+        elif self._normalization_version == NORMALIZATION_VERSION_V2:
+            normalized = normalize_persian_v2(raw_text)
+        else:
+            normalized = normalize_persian(raw_text)
         if not normalized.strip():
             raise EmbeddingValidationError("text must not be empty after preprocessing")
         return normalized
