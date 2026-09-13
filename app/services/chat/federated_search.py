@@ -13,7 +13,7 @@ from app.core.logging import logger
 from app.models.document import DocumentModel
 from rag import rag_service
 
-MIN_SIMILARITY_SCORE = float(os.getenv("RAG_MIN_SIMILARITY_SCORE", "0.52"))
+MIN_SIMILARITY_SCORE = float(os.getenv("RAG_MIN_SIMILARITY_SCORE", "0.38"))
 
 
 

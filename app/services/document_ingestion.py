@@ -94,6 +94,7 @@ def process_document_ingestion_task(
         chunk_count = max(1, page_count * 2)
 
         # 2. Vector Store Ingestion (In-Process RAG)
+        rag_res = None
         try:
             rag_res = rag_service.ingest_file(
                 data=content,
@@ -123,18 +124,22 @@ def process_document_ingestion_task(
                     )
                     if rag_res and "chunk_count" in rag_res:
                         chunk_count = rag_res["chunk_count"]
+                        logger.info(f"✅ Indexed {doc_id} via text fallback with {chunk_count} chunks into RAG store.")
                 except Exception as e2:
                     logger.error(f"Failed fallback RAG ingestion for {doc_id}: {e2}")
 
-        # 3. Update Document Record to 'indexed'
+        # 3. Update Document Record
         doc = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
         if doc:
             doc.page_count = page_count
-            doc.chunk_count = chunk_count
+            doc.chunk_count = chunk_count if (rag_res and rag_res.get("chunk_count", 0) > 0) else 0
             doc.extracted_text = extracted_text
-            doc.status = "indexed"
+            doc.status = "indexed" if (rag_res and rag_res.get("chunk_count", 0) > 0) else "failed"
             db.commit()
-            logger.info(f"🎉 Background ingestion completed for {doc_id} ({page_count} pages, {chunk_count} chunks).")
+            if doc.status == "indexed":
+                logger.info(f"🎉 Background ingestion completed for {doc_id} ({page_count} pages, {chunk_count} chunks).")
+            else:
+                logger.warning(f"⚠️ Vector embedding failed for document {doc_id}; marked status as 'failed'.")
     except Exception as exc:
         logger.error(f"❌ Background ingestion failed for document {doc_id}: {exc}", exc_info=True)
         try:
