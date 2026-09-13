@@ -16,18 +16,18 @@ _HEYDARI_MODEL_ID = "heydariAI/persian-embeddings"
 class ModelRegistry:
     """Factory for EmbeddingModel backends."""
 
-    _BACKENDS = ("stub", "sentence-transformers")
+    _BACKENDS = ("stub", "sentence-transformers", "sentence_transformers")
 
     @staticmethod
     def create(config: EmbeddingConfig) -> EmbeddingModel:
-        backend = config.backend
+        backend = (config.backend or "stub").strip().replace("_", "-").lower()
         if backend == "stub":
             return StubEmbeddingModel(
                 model_id=config.model_id,
                 device=config.device,
                 normalization_version=config.preprocessing.normalization_version,
             )
-        if backend == "sentence-transformers":
+        if backend in ("sentence-transformers", "sentencetransformers", "local"):
             try:
                 if config.model_id == _HEYDARI_MODEL_ID or config.candidate_id == "M3-persian-heydari":
                     return HeydariPersianBackend(config)

@@ -30,9 +30,9 @@ def test_file_upload_db_delete_orphan_free():
     assert doc.extracted_text == doc_content
     
     import time
-    # Wait for background task to complete indexing
+    # Wait for background task to complete indexing (cold model load might take ~15s)
     status = doc.status
-    for _ in range(30):
+    for _ in range(60):
         db.expire_all()
         fresh_doc = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
         if fresh_doc and fresh_doc.status in ("indexed", "failed"):

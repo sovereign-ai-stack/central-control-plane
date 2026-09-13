@@ -126,6 +126,8 @@ def _config_from_mapping(block: dict[str, Any]) -> EmbeddingConfig:
     import os
     env_backend = os.getenv("RAG_EMBEDDING_BACKEND")
     backend = env_backend or block.get("backend") or block.get("provider")
+    if backend:
+        backend = str(backend).strip().replace("_", "-").lower()
     if backend == "local":
         backend = "sentence-transformers"
     model_id = block.get("model_id")
