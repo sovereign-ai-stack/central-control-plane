@@ -136,3 +136,31 @@ async def sync_managed_models(
         raise HTTPException(status_code=500, detail=f"خطا در همگام‌سازی با LiteLLM: {str(e)}")
 
 
+@router.get("/admin/settings/thinking", response_model=Dict[str, Any])
+async def get_thinking_setting(
+    user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns current state of deep thinking / CoT mode."""
+    _require_super_admin(user)
+    from app.services.system_setting_service import SystemSettingService
+    is_enabled = SystemSettingService.get_bool("enable_thinking", default=False, db=db)
+    return {"enable_thinking": is_enabled, "enableThinking": is_enabled}
+
+
+@router.post("/admin/settings/thinking", response_model=Dict[str, Any])
+async def update_thinking_setting(
+    payload: Dict[str, Any],
+    user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Updates state of deep thinking / CoT mode."""
+    _require_super_admin(user)
+    from app.services.system_setting_service import SystemSettingService
+    enabled_val = payload.get("enable_thinking") if "enable_thinking" in payload else payload.get("enableThinking", False)
+    val_str = "true" if bool(enabled_val) else "false"
+    SystemSettingService.set_value("enable_thinking", val_str, db=db)
+    return {"enable_thinking": bool(enabled_val), "enableThinking": bool(enabled_val), "success": True}
+
+
+

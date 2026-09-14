@@ -49,6 +49,29 @@ import { Attachment, AttachmentContent, AttachmentDescription, AttachmentGroup, 
 import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
+const ROUTE_BADGES: Record<string, { labelFa: string; labelEn: string; color: string }> = {
+  coding: {
+    labelFa: "کدنویسی",
+    labelEn: "Coding",
+    color: "bg-emerald-500/10 border-emerald-500/30 text-emerald-400",
+  },
+  reasoning: {
+    labelFa: "استدلال منطقی",
+    labelEn: "Reasoning",
+    color: "bg-purple-500/10 border-purple-500/30 text-purple-400",
+  },
+  rag: {
+    labelFa: "پایگاه دانش",
+    labelEn: "Knowledge Base",
+    color: "bg-amber-500/10 border-amber-500/30 text-amber-400",
+  },
+  general: {
+    labelFa: "دستیار عمومی",
+    labelEn: "General",
+    color: "bg-brand-cyan/10 border-brand-cyan/30 text-brand-cyan",
+  },
+};
+
 export interface ThreadProps extends React.ComponentProps<"div"> {
   messages: MessageType[];
   isStreaming?: boolean;
@@ -388,6 +411,16 @@ export function Thread({
                           <span className="text-[14px] sm:text-[15px] font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#6EF0C2] to-[#31C8ED]">
                             Sovereign AI
                           </span>
+                          {message.route && ROUTE_BADGES[message.route] && (
+                            <span className={cn(
+                              "text-[10px] font-medium px-2 py-0.5 rounded-full border shadow-sm transition-all",
+                              ROUTE_BADGES[message.route].color
+                            )}>
+                              {language === "fa"
+                                ? `مسیر: ${ROUTE_BADGES[message.route].labelFa}`
+                                : `Route: ${ROUTE_BADGES[message.route].labelEn}`}
+                            </span>
+                          )}
                         </div>
                       </div>
 

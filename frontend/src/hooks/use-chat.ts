@@ -573,10 +573,10 @@ export function useChat(initialLanguage: Language = "fa") {
             try {
               const event: StreamEvent = JSON.parse(jsonStr);
 
-              if (event.type === "progress") {
+              if (event.type === "progress" || (event as any).type === "stage") {
                 setActiveRequestId(event.requestId);
                 setStreamingStage(event.stage);
-                setStreamingLabel(event.label);
+                setStreamingLabel(event.label || (event as any).text);
               } else if (event.type === "delta") {
                 setActiveRequestId(event.requestId);
                 streamingTextRef.current += event.text;

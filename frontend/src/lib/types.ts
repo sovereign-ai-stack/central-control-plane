@@ -62,6 +62,7 @@ export interface Message {
   attachments?: FileAttachment[];
   replyToId?: string;
   replyToSnippet?: string;
+  route?: string;
   createdAt: string;
 }
 

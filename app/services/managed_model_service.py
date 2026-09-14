@@ -296,6 +296,7 @@ class ManagedModelService:
             d["litellmSynced"] = (m.assigned_role in litellm_model_names or m.model_id in litellm_model_names)
             models_list.append(d)
 
+        from app.services.system_setting_service import SystemSettingService
         enabled_count = len([m for m in models_list if m["isEnabled"]])
         return {
             "models": models_list,
@@ -307,6 +308,7 @@ class ManagedModelService:
                 "litellmModelsCount": len(litellm_model_names),
                 "litellmConnected": bool(litellm_model_names or litellm_client.health_check()),
                 "inSync": True,
+                "thinkingEnabled": SystemSettingService.get_bool("enable_thinking", default=False, db=db),
             }
         }
 

@@ -9,6 +9,7 @@ from app.models.document import DocumentModel
 from app.models.conversation import ConversationModel
 from app.models.mcp_key import McpKeyModel
 from app.models.managed_model import ManagedModelModel
+from app.models.system_setting import SystemSettingModel
 
 __all__ = [
     "OrganizationModel",
@@ -19,4 +20,5 @@ __all__ = [
     "ConversationModel",
     "McpKeyModel",
     "ManagedModelModel",
+    "SystemSettingModel",
 ]

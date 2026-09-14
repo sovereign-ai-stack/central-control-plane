@@ -81,6 +81,8 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
   const [activeTab, setActiveTab] = React.useState<"models" | "nodes">("models");
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<{ id: string; name: string } | null>(null);
+  const [thinkingEnabled, setThinkingEnabled] = React.useState<boolean>(false);
+  const [togglingThinking, setTogglingThinking] = React.useState<boolean>(false);
   const [testResult, setTestResult] = React.useState<{
     modelName: string;
     loading: boolean;
@@ -98,6 +100,9 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
         const data = await res.json();
         setModels(data.models || []);
         setNodes(data.activeNodes || []);
+        if (data.summary?.thinkingEnabled !== undefined) {
+          setThinkingEnabled(Boolean(data.summary.thinkingEnabled));
+        }
       }
     } catch (err) {
       console.error("Failed to fetch models:", err);
@@ -106,6 +111,26 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
       setRefreshing(false);
     }
   }, []);
+
+  const handleToggleThinking = async () => {
+    try {
+      setTogglingThinking(true);
+      const nextState = !thinkingEnabled;
+      const res = await fetch("/api/admin/settings/thinking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enable_thinking: nextState }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setThinkingEnabled(Boolean(data.enable_thinking));
+      }
+    } catch (err) {
+      console.error("Failed to toggle thinking setting:", err);
+    } finally {
+      setTogglingThinking(false);
+    }
+  };
 
   const handleForceSync = React.useCallback(async () => {
     try {
@@ -309,6 +334,44 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* 2.5 INFERENCE & REASONING CONFIGURATION (THINKING MODE TOGGLE) */}
+      <Card className="bg-surface-raised/80 border-border/40 p-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="size-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center text-purple-400 shrink-0">
+              <Sparkles className="size-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-on-surface">حالت تفکر عمیق و استدلال (Chain of Thought / Think Mode)</span>
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0.2 border ${thinkingEnabled ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400" : "bg-surface-container border-border/40 text-on-surface-variant"}`}>
+                  {thinkingEnabled ? "فعال" : "غیرفعال"}
+                </Badge>
+              </div>
+              <p className="text-[11px] text-on-surface-variant mt-0.5">
+                اجبار مدل‌ها به تفکر گام‌به‌گام درون تگ‌های &lt;think&gt;. (برای مدل‌های سبک زیر 7B خاموش نگه دارید تا از تکرار کلمات جلوگیری شود)
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={thinkingEnabled}
+            disabled={togglingThinking}
+            onClick={handleToggleThinking}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              thinkingEnabled ? "bg-brand-cyan" : "bg-surface-container-high"
+            } ${togglingThinking ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <span
+              className={`pointer-events-none inline-block size-5 transform rounded-full bg-slate-950 shadow-lg ring-0 transition duration-200 ease-in-out ${
+                thinkingEnabled ? "translate-x-[-20px]" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
+      </Card>
 
       {/* 3. TABS NAVIGATION */}
       <div className="flex items-center gap-2 border-b border-border/30 pb-1">

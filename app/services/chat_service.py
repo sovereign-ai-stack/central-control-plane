@@ -187,7 +187,17 @@ class ChatService:
                     metadata={"duration_ms": route_latency_ms, "explicit_use_rag": explicit_use_rag},
                 )
 
-                # 4. Emit Dynamic Progress Stage
+                # 4. Emit Dynamic Progress Stage and Semantic Route Tool Marker
+                route_names_fa = {
+                    "coding": "توسعه و کدنویسی (Coding)",
+                    "reasoning": "استدلال منطقی و عمیق (Reasoning)",
+                    "rag": "پایگاه دانش سازمانی (RAG)",
+                    "general": "دستیار عمومی و محاوره‌ای (General)",
+                }
+                route_fa_label = route_names_fa.get(detected_route, detected_route.upper())
+                confidence_pct = int(confidence_score * 100) if confidence_score <= 1.0 else int(confidence_score)
+                route_summary = f"اطمینان: {confidence_pct}% ({routing_method})"
+
                 if detected_route == "rag" and explicit_use_rag is True:
                     org_label = "سازمان"
                     team_label = "پایگاه دانش"
@@ -207,7 +217,8 @@ class ChatService:
                 else:
                     progress_text = "مسیر مکالمه: دستیار هوشمند عمومی — پردازش محاوره‌ای پرامپت" if is_fa else "Routing: General Conversational Assistant"
 
-                yield f"event: stage\ndata: {json.dumps({'type': 'stage', 'requestId': req_id, 'stage': 'routing', 'route': detected_route, 'confidence': confidence_score, 'method': routing_method, 'patterns': matched_patterns, 'text': progress_text}, ensure_ascii=False)}\n\n"
+                yield f"event: progress\ndata: {json.dumps({'type': 'progress', 'requestId': req_id, 'stage': 'routing', 'label': progress_text}, ensure_ascii=False)}\n\n"
+                yield f"event: tool\ndata: {json.dumps({'type': 'tool', 'requestId': req_id, 'name': 'semantic_router', 'label': f'مسیر انتخابی: {route_fa_label}' if is_fa else f'Selected Route: {detected_route.upper()}', 'status': 'completed', 'summary': route_summary}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.02)
 
                 # 5. Federated Vector RAG Retrieval
@@ -293,11 +304,15 @@ class ChatService:
                 else:
                     target_model = "general-model"
 
+                from app.services.system_setting_service import SystemSettingService
+                enable_thinking = SystemSettingService.get_bool("enable_thinking", default=False, db=db)
+
                 system_prompt = ChatPromptBuilder.build_system_prompt(
                     route=detected_route,
                     explicit_use_rag=bool(explicit_use_rag),
                     rag_context_text=rag_context_text,
                     is_fa=is_fa,
+                    enable_thinking=enable_thinking,
                 )
 
                 # 7. LLM Stream Processing with Thinking Delimiters
@@ -494,6 +509,7 @@ class ChatService:
                     "content": clean_final_content,
                     "reasoningContent": clean_thinking if clean_thinking else None,
                     "status": "complete",
+                    "route": detected_route,
                     "citations": real_citations,
                     "createdAt": datetime.now(timezone.utc).isoformat(),
                 }

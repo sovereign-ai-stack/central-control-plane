@@ -16,19 +16,27 @@ class ChatPromptBuilder:
         explicit_use_rag: Optional[bool],
         rag_context_text: str,
         is_fa: bool,
+        enable_thinking: bool = False,
     ) -> str:
         if route == "reasoning":
-            return (
-                "شما یک دستیار هوش مصنوعی تحلیل‌گر، دقیق و متخصص در استدلال منطقی و ریاضیات هستید.\n\n"
-                "دستورالعمل‌های ساختار پاسخ (الزامی):\n"
-                "۱. حتماً و الزاماً در ابتدای پاسخ، تمام مراحل تفکر، تجزیه مسئله و استدلال گام‌به‌گام را درون تگ‌های <think>...</think> بنویسید.\n"
-                "۲. پس از بستن تگ </think>، مستقیماً پاسخ نهایی و شفاف را به زبان فارسی ارائه دهید (از آوردن یادداشت‌های متای داخلی در پاسخ نهایی خودداری کنید)."
-                if is_fa else
-                "You are an advanced analytical reasoning AI assistant.\n\n"
-                "OUTPUT STRUCTURE INSTRUCTIONS (MANDATORY):\n"
-                "1. You must place your entire step-by-step reasoning strictly inside <think>...</think> tags at the beginning of your response.\n"
-                "2. Immediately after </think>, provide the clean, precise final answer without meta-commentary."
-            )
+            if enable_thinking:
+                return (
+                    "شما یک دستیار هوش مصنوعی تحلیل‌گر، دقیق و متخصص در استدلال منطقی و ریاضیات هستید.\n\n"
+                    "دستورالعمل‌های ساختار پاسخ (الزامی):\n"
+                    "۱. حتماً و الزاماً در ابتدای پاسخ، تمام مراحل تفکر، تجزیه مسئله و استدلال گام‌به‌گام را درون تگ‌های <think>...</think> بنویسید.\n"
+                    "۲. پس از بستن تگ </think>، مستقیماً پاسخ نهایی و شفاف را به زبان فارسی ارائه دهید (از آوردن یادداشت‌های متای داخلی در پاسخ نهایی خودداری کنید)."
+                    if is_fa else
+                    "You are an advanced analytical reasoning AI assistant.\n\n"
+                    "OUTPUT STRUCTURE INSTRUCTIONS (MANDATORY):\n"
+                    "1. You must place your entire step-by-step reasoning strictly inside <think>...</think> tags at the beginning of your response.\n"
+                    "2. Immediately after </think>, provide the clean, precise final answer without meta-commentary."
+                )
+            else:
+                return (
+                    "شما یک دستیار هوش مصنوعی تحلیل‌گر، دقیق و متخصص در استدلال منطقی، ریاضیات و حل مسائل تحلیلی هستید. لطفاً پاسخ‌های مستدل، ساختاریافته، دقیق و شفاف ارائه دهید."
+                    if is_fa else
+                    "You are an advanced analytical reasoning AI assistant specialized in logic, mathematics, and structured problem solving. Provide accurate, clear, and well-reasoned answers."
+                )
 
         if route == "coding":
             return (
