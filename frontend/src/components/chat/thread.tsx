@@ -174,7 +174,21 @@ export function Thread({
 
   const copyMessage = async (messageId: string, text: string) => {
     try {
-      await navigator.clipboard.writeText(text);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        if (!ok) throw new Error("Fallback copy failed");
+      }
       setCopiedMessageId(messageId);
       toast.success(language === "fa" ? "پاسخ در کلیپ‌بورد کپی شد." : "Answer copied to clipboard.");
       window.setTimeout(() => setCopiedMessageId(null), 2000);

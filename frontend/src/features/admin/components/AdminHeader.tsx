@@ -47,10 +47,6 @@ export function AdminHeader({
           <Shield className="size-4 text-brand-cyan hidden sm:inline-block" />
           <span>پلتفرم کنترل متمرکز هوش مصنوعی</span>
         </div>
-        <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container/50 border border-border/30 text-[10.5px] text-on-surface-variant font-mono">
-          <span className="size-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span>Cluster: 100% Operational</span>
-        </div>
       </div>
 
       <div className="flex items-center gap-2">

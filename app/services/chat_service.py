@@ -305,7 +305,9 @@ class ChatService:
                 is_connected = False
                 stream_parser = StreamBufferParser()
 
-                # Build full conversational history context (System prompt + Prior turns + Current prompt)
+                # Build context window (System prompt + Prior turns + Current prompt)
+                reply_snippet = payload.reply_to_snippet or payload.replyToSnippet
+
                 history_turns = []
                 for m in messages_list[:-1]:
                     r = m.get("role")
@@ -313,11 +315,23 @@ class ChatService:
                     if r in ("user", "assistant") and c and isinstance(c, str) and c.strip():
                         history_turns.append({"role": r, "content": c.strip()})
 
-                # Maintain reasonable context window (last 16 messages / 8 back-and-forth turns)
-                if len(history_turns) > 16:
-                    history_turns = history_turns[-16:]
+                if reply_snippet and isinstance(reply_snippet, str) and reply_snippet.strip():
+                    clean_snip = reply_snippet.strip()
+                    user_content = (
+                        f"[در پاسخ به متن:\n«{clean_snip}»]\n\n{payload.message}"
+                        if is_fa else
+                        f"[Replying to:\n\"{clean_snip}\"]\n\n{payload.message}"
+                    )
+                    # When explicitly replying to a snippet, prioritize that snippet and keep at most 2 prior messages
+                    if len(history_turns) > 2:
+                        history_turns = history_turns[-2:]
+                else:
+                    user_content = payload.message
+                    # Keep a tight, focused history (last 4 messages / 2 back-and-forth turns)
+                    if len(history_turns) > 4:
+                        history_turns = history_turns[-4:]
 
-                chat_messages = [{"role": "system", "content": system_prompt}] + history_turns + [{"role": "user", "content": payload.message}]
+                chat_messages = [{"role": "system", "content": system_prompt}] + history_turns + [{"role": "user", "content": user_content}]
 
                 stream_gen = litellm_client.chat_completion_stream(
                     model=target_model,
@@ -331,6 +345,10 @@ class ChatService:
                         "organization_id": user_org,
                         "team_id": user_team,
                     },
+                    max_tokens=2048,
+                    temperature=0.7,
+                    presence_penalty=0.15,
+                    frequency_penalty=0.25,
                 )
 
                 async for chunk in stream_gen:

@@ -154,11 +154,19 @@ class LiteLLMClient:
         messages: List[Dict[str, str]],
         user_id: str,
         metadata: Optional[Dict[str, Any]] = None,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+        presence_penalty: float = 0.15,
+        frequency_penalty: float = 0.25,
     ) -> Optional[Dict[str, Any]]:
         payload = {
             "model": model,
             "messages": messages,
             "user": user_id,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "presence_penalty": presence_penalty,
+            "frequency_penalty": frequency_penalty,
         }
         if metadata:
             payload["metadata"] = metadata
@@ -176,6 +184,10 @@ class LiteLLMClient:
         messages: List[Dict[str, str]],
         user_id: str,
         metadata: Optional[Dict[str, Any]] = None,
+        max_tokens: int = 2048,
+        temperature: float = 0.7,
+        presence_penalty: float = 0.15,
+        frequency_penalty: float = 0.25,
         timeout: float = 120.0,
     ):
         """Streams chat completion chunks from LiteLLM / local inference engine via SSE."""
@@ -185,6 +197,10 @@ class LiteLLMClient:
             "messages": messages,
             "user": user_id,
             "stream": True,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "presence_penalty": presence_penalty,
+            "frequency_penalty": frequency_penalty,
         }
         if metadata:
             payload["metadata"] = metadata

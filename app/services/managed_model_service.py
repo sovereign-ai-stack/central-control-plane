@@ -152,8 +152,15 @@ class ManagedModelService:
                 cls.sync_model_to_litellm(m)
                 synced_count += 1
 
-            # 4. Sync all healthy GPU worker nodes into LiteLLM
-            for node in healthy_nodes:
+            # 4. Sync all healthy GPU worker nodes into LiteLLM (respecting manual disable)
+            disabled_node_ids = {
+                m.id.replace("node_", "", 1)
+                for m in db_models
+                if m.provider == "local_node" and not m.is_enabled
+            }
+            allowed_nodes = [n for n in healthy_nodes if n.get("node_id") not in disabled_node_ids]
+
+            for node in allowed_nodes:
                 cls._sync_node_to_litellm(node)
                 synced_count += 1
 
@@ -162,7 +169,7 @@ class ManagedModelService:
             fresh_litellm_models = litellm_client.get_registered_models()
             active_roles = {lm.get("model_name") for lm in fresh_litellm_models if lm.get("model_name")}
 
-            # Choose fallback source: First prefer enabled DB model, then healthy GPU node
+            # Choose fallback source: First prefer enabled DB model, then allowed GPU node
             if enabled_models:
                 fallback_source = enabled_models[0]
                 for r in standard_roles:
@@ -181,8 +188,8 @@ class ManagedModelService:
                                 "context_window": fallback_source.context_window,
                             },
                         )
-            elif healthy_nodes:
-                fallback_node = healthy_nodes[0]
+            elif allowed_nodes:
+                fallback_node = allowed_nodes[0]
                 f_api_base = fallback_node.get("api_base", "").rstrip("/")
                 f_v1 = f_api_base if f_api_base.endswith("/v1") else f"{f_api_base}/v1"
                 f_served = fallback_node.get("served_model_name") or "coding-model"
@@ -247,18 +254,25 @@ class ManagedModelService:
                     updated_at=now,
                 )
                 db.add(new_node_model)
+                if is_healthy and served_name not in litellm_model_names:
+                    cls._sync_node_to_litellm(node)
+                    litellm_model_names.add(served_name)
+                    litellm_model_names.add("general-model")
             else:
-                existing.is_enabled = is_healthy
+                # If hardware is offline, force disable
+                if not is_healthy:
+                    existing.is_enabled = False
+                # If hardware is healthy, keep existing.is_enabled (respecting user's manual toggle switch)
                 existing.api_base = node.get("api_base") or existing.api_base
                 existing.model_id = node.get("model_name") or existing.model_id
                 existing.assigned_role = served_name
                 existing.updated_at = now
 
-            # If node is healthy but its routes are missing in LiteLLM (e.g. after LiteLLM restart), auto-register
-            if is_healthy and served_name not in litellm_model_names:
-                cls._sync_node_to_litellm(node)
-                litellm_model_names.add(served_name)
-                litellm_model_names.add("general-model")
+                # If healthy and enabled, ensure synced to LiteLLM
+                if existing.is_enabled and served_name not in litellm_model_names:
+                    cls._sync_node_to_litellm(node)
+                    litellm_model_names.add(served_name)
+                    litellm_model_names.add("general-model")
 
         # 2. Deactivate any local_node records whose node is no longer in active_nodes
         stale_nodes = db.query(ManagedModelModel).filter(

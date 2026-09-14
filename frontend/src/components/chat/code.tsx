@@ -103,7 +103,21 @@ export function CodeBlock({
 
   const onCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = code;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        if (!ok) throw new Error("Copy command failed");
+      }
       setCopied(true);
       toast.success("کد در کلیپ‌بورد کپی شد");
       setTimeout(() => setCopied(false), 2000);
@@ -121,26 +135,33 @@ export function CodeBlock({
       aria-label="Code snippet"
       data-slot="code-block"
       className={cn(
-        "bg-surface-container-lowest/60 backdrop-blur-md rounded-2xl my-6 overflow-hidden shadow-lg shadow-black/20 border border-border/30 text-left font-mono",
+        "bg-[#0d1117] rounded-xl my-4 overflow-hidden shadow-md shadow-black/30 border border-border/40 text-left font-mono",
         className
       )}
       {...props}
     >
       {/* Code Header bar */}
-      <div className="flex justify-between items-center bg-surface-container-low/60 px-5 py-3 border-b border-border/20">
-        <span className="text-[13px] text-on-surface-variant/80 font-mono tracking-wide">
-          {title}
-        </span>
+      <div className="flex justify-between items-center bg-[#161b22] px-4 py-2 border-b border-border/25 select-none">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-red-500/60 inline-block"></span>
+            <span className="size-2.5 rounded-full bg-yellow-500/60 inline-block"></span>
+            <span className="size-2.5 rounded-full bg-emerald-500/60 inline-block"></span>
+          </div>
+          <span className="text-[12px] font-semibold text-on-surface-variant font-mono uppercase tracking-wider ml-1">
+            {title}
+          </span>
+        </div>
         <button
           type="button"
           onClick={onCopy}
-          className="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1.5 text-[13px] bg-surface-raised/40 px-2.5 py-1 rounded-lg border border-border/20 hover:bg-surface-raised/60 cursor-pointer active:scale-95"
+          className="text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1.5 text-[12px] bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-md border border-white/10 cursor-pointer active:scale-95"
           aria-label="Copy code"
         >
           {copied ? (
             <>
-              <Check className="size-3.5 text-brand-mint" />
-              <span className="text-brand-mint text-xs">Copied!</span>
+              <Check className="size-3.5 text-emerald-400" />
+              <span className="text-emerald-400 text-xs font-semibold">Copied!</span>
             </>
           ) : (
             <>
@@ -151,10 +172,10 @@ export function CodeBlock({
         </button>
       </div>
 
-      {/* Code Body */}
-      <div className="p-5 overflow-x-auto bg-[#0a0b0f]/70">
-        <pre className="font-mono text-[14px] leading-loose whitespace-pre [unicode-bidi:isolate]">
-          <code dir="ltr">{highlightedCode}</code>
+      {/* Code Body with tight, readable developer line height */}
+      <div className="p-4 overflow-x-auto bg-[#090d13]">
+        <pre className="font-mono text-[13px] leading-[1.65] tracking-normal whitespace-pre [unicode-bidi:isolate] text-slate-200">
+          <code dir="ltr" className="font-mono">{highlightedCode}</code>
         </pre>
       </div>
     </div>
