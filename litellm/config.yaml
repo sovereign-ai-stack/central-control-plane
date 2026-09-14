@@ -9,12 +9,13 @@ router_settings:
   num_retries: 3
   timeout: 300
   cooldown_time: 30
-  allowed_fails: 1
-  enable_pre_call_checks: true
+  allowed_fails: 2
+  enable_pre_call_checks: false
   fallbacks:
-    - "coding-model": ["reasoning-model", "general-model"]
-    - "reasoning-model": ["coding-model", "general-model"]
-    - "rag-model": ["general-model"]
+    - "general-model": ["coding-model", "reasoning-model", "rag-model"]
+    - "coding-model": ["general-model", "reasoning-model", "rag-model"]
+    - "reasoning-model": ["general-model", "coding-model", "rag-model"]
+    - "rag-model": ["general-model", "coding-model", "reasoning-model"]
 
 litellm_settings:
   drop_params: true

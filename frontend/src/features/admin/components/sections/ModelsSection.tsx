@@ -76,6 +76,7 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
   const [nodes, setNodes] = React.useState<GpuNode[]>([]);
   const [loading, setLoading] = React.useState<boolean>(true);
   const [refreshing, setRefreshing] = React.useState<boolean>(false);
+  const [syncing, setSyncing] = React.useState<boolean>(false);
   const [isAddOpen, setIsAddOpen] = React.useState<boolean>(false);
   const [activeTab, setActiveTab] = React.useState<"models" | "nodes">("models");
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
@@ -105,6 +106,20 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
       setRefreshing(false);
     }
   }, []);
+
+  const handleForceSync = React.useCallback(async () => {
+    try {
+      setSyncing(true);
+      const res = await fetch("/api/admin/models/sync", { method: "POST" });
+      if (res.ok) {
+        await fetchModelsData();
+      }
+    } catch (err) {
+      console.error("Failed to sync models with LiteLLM:", err);
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetchModelsData]);
 
   React.useEffect(() => {
     fetchModelsData();
@@ -219,8 +234,19 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
           <Button
             variant="outline"
             size="sm"
+            onClick={handleForceSync}
+            disabled={syncing || refreshing}
+            className="text-xs h-8 gap-1.5 border-purple-500/40 hover:border-purple-500 bg-purple-500/10 text-purple-300 hover:text-purple-200 cursor-pointer"
+          >
+            <RefreshCw className={`size-3.5 ${syncing ? "animate-spin text-purple-400" : ""}`} />
+            همگام‌سازی کامل با LiteLLM
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={fetchModelsData}
-            disabled={refreshing}
+            disabled={refreshing || syncing}
             className="text-xs h-8 gap-1.5 border-border/40 hover:border-brand-cyan/40 text-on-surface-variant hover:text-on-surface cursor-pointer"
           >
             <RefreshCw className={`size-3.5 ${refreshing ? "animate-spin text-brand-cyan" : ""}`} />
@@ -347,13 +373,22 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
                 >
                   <CardHeader className="pb-2.5 flex flex-row items-start justify-between space-y-0">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <CardTitle className="text-sm font-bold text-on-surface">
                           {model.name}
                         </CardTitle>
                         <Badge variant="outline" className={`text-[10px] px-1.5 py-0.5 border ${roleInfo.color}`}>
                           {roleInfo.label}
                         </Badge>
+                        {model.litellmSynced ? (
+                          <Badge variant="outline" className="text-[9.5px] px-1.5 py-0.5 border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                            ✓ سینک در LiteLLM
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[9.5px] px-1.5 py-0.5 border-amber-500/30 bg-amber-500/10 text-amber-400">
+                            در انتظار سینک
+                          </Badge>
+                        )}
                       </div>
                       <div className="text-[11px] text-on-surface-variant font-mono">
                         {providerLabel} • <span className="text-on-surface">{model.modelId}</span>

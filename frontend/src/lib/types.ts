@@ -168,6 +168,7 @@ export interface ManagedModel {
   assignedRole: "general-model" | "coding-model" | "reasoning-model" | "rag-model" | string;
   isEnabled: boolean;
   contextWindow: number;
+  litellmSynced?: boolean;
   createdAt: string;
   updatedAt: string;
 }

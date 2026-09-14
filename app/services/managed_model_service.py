@@ -56,31 +56,83 @@ class ManagedModelService:
         return role_ok
 
     @classmethod
+    def _sync_node_to_litellm(cls, node: Dict[str, Any]) -> bool:
+        """Registers all roles and aliases of an active GPU node into LiteLLM Proxy."""
+        node_id = node.get("node_id")
+        if not node_id:
+            return False
+        api_base = node.get("api_base", "").rstrip("/")
+        if not api_base:
+            return False
+        v1_base = api_base if api_base.endswith("/v1") else f"{api_base}/v1"
+
+        served_model = node.get("served_model_name") or "coding-model"
+        physical_model = node.get("model_name") or served_model
+
+        aliases = [served_model]
+        if physical_model not in aliases:
+            aliases.append(physical_model)
+        for r in node.get("supported_roles", []):
+            if r not in aliases:
+                aliases.append(r)
+        # Always guarantee general-model is registered as an alias so general queries work
+        if "general-model" not in aliases:
+            aliases.append("general-model")
+
+        all_ok = True
+        for target_alias in aliases:
+            model_info = {
+                "id": f"{node_id}-{target_alias.replace('/', '_').replace(':', '_')}",
+                "mode": "chat",
+                "node_id": node_id,
+                "provider": "local_node",
+                "physical_model": physical_model,
+                "description": f"GPU Node: {node_id} | Model: {physical_model}",
+            }
+            ok = litellm_client.register_model(
+                model_name=target_alias,
+                litellm_model=f"openai/{served_model}",
+                api_key="sk-vllm-dummy",
+                api_base=v1_base,
+                model_info=model_info,
+            )
+            if not ok:
+                all_ok = False
+        return all_ok
+
+    @classmethod
     def reconcile_all_models_with_litellm(cls, db: Session) -> Dict[str, Any]:
         """
-        Full synchronization between Database and LiteLLM Proxy:
+        Full synchronization between Database, Registry Nodes, and LiteLLM Proxy:
         1. Purges all orphaned, static dummy, or phantom models from LiteLLM.
-        2. Registers all active models into LiteLLM Proxy under their respective system roles.
+        2. Registers all active DB models into LiteLLM Proxy under their respective system roles.
+        3. Ensures active hardware GPU nodes are synchronized into LiteLLM.
+        4. Guarantees all standard system roles have a working backend.
         """
         try:
             db_models = db.query(ManagedModelModel).all()
-            enabled_models = [m for m in db_models if m.is_enabled]
+            enabled_models = [m for m in db_models if m.is_enabled and m.provider != "local_node"]
             enabled_map = {m.id: m for m in enabled_models}
 
-            # 1. Fetch current models from LiteLLM Proxy
+            # 1. Fetch current models from LiteLLM Proxy and Registry Nodes
             litellm_models = litellm_client.get_registered_models()
+            active_nodes = registry_client.get_nodes()
+            healthy_nodes = [n for n in active_nodes if n.get("status") == "healthy"]
             deleted_count = 0
 
-            # 2. Purge stale/orphaned DB models from LiteLLM (without touching node models)
+            # 2. Purge stale/orphaned DB models from LiteLLM (preserve active nodes)
+            active_node_ids = {n.get("node_id") for n in healthy_nodes}
             for lm in litellm_models:
                 m_info = lm.get("model_info", {})
                 lid = m_info.get("id")
                 db_mid = m_info.get("db_model_id")
                 node_id = m_info.get("node_id")
 
-                # Dynamic worker nodes registered via Node Registry (Path B) manage their own lifecycle.
-                # Do NOT purge them here under any circumstance!
+                # If it's an active GPU node, verify the node is still alive
                 if node_id:
+                    if node_id not in active_node_ids and lid:
+                        litellm_client.delete_model_by_id(lid)
+                        deleted_count += 1
                     continue
 
                 # If this model was managed by DB, check if it's still enabled and role matches
@@ -90,32 +142,29 @@ class ManagedModelService:
                             litellm_client.delete_model_by_id(lid)
                             deleted_count += 1
                 elif enabled_models:
-                    # Legacy or unmanaged orphaned route without node_id and without db_mid
                     if lid:
                         litellm_client.delete_model_by_id(lid)
                         deleted_count += 1
 
-            # 3. Register/Update all enabled models into LiteLLM
+            # 3. Register/Update all enabled DB models into LiteLLM
             synced_count = 0
             for m in enabled_models:
                 cls.sync_model_to_litellm(m)
                 synced_count += 1
 
-            # 4. Guarantee all standard roles have a working backend dynamically
+            # 4. Sync all healthy GPU worker nodes into LiteLLM
+            for node in healthy_nodes:
+                cls._sync_node_to_litellm(node)
+                synced_count += 1
+
+            # 5. Guarantee all standard roles have a working backend dynamically
             standard_roles = ["general-model", "coding-model", "reasoning-model", "rag-model"]
-            active_roles = {m.assigned_role for m in enabled_models}
+            fresh_litellm_models = litellm_client.get_registered_models()
+            active_roles = {lm.get("model_name") for lm in fresh_litellm_models if lm.get("model_name")}
 
-            # Include roles already actively served by dynamic GPU nodes
-            node_provided_roles = {
-                lm.get("model_name")
-                for lm in litellm_models
-                if lm.get("model_info", {}).get("node_id")
-            }
-            active_roles.update(node_provided_roles)
-
-            fallback_source = enabled_models[0] if enabled_models else None
-
-            if fallback_source:
+            # Choose fallback source: First prefer enabled DB model, then healthy GPU node
+            if enabled_models:
+                fallback_source = enabled_models[0]
                 for r in standard_roles:
                     if r not in active_roles:
                         litellm_model = cls._format_litellm_model_string(fallback_source.provider, fallback_source.model_id)
@@ -132,6 +181,26 @@ class ManagedModelService:
                                 "context_window": fallback_source.context_window,
                             },
                         )
+            elif healthy_nodes:
+                fallback_node = healthy_nodes[0]
+                f_api_base = fallback_node.get("api_base", "").rstrip("/")
+                f_v1 = f_api_base if f_api_base.endswith("/v1") else f"{f_api_base}/v1"
+                f_served = fallback_node.get("served_model_name") or "coding-model"
+                for r in standard_roles:
+                    if r not in active_roles:
+                        litellm_client.register_model(
+                            model_name=r,
+                            litellm_model=f"openai/{f_served}",
+                            api_key="sk-vllm-dummy",
+                            api_base=f_v1,
+                            model_info={
+                                "mode": "chat",
+                                "node_id": fallback_node.get("node_id"),
+                                "provider": "local_node",
+                                "physical_model": fallback_node.get("model_name"),
+                                "description": f"Fallback role {r} mapped to node {fallback_node.get('node_id')}",
+                            },
+                        )
 
             logger.info(f"Reconciled LiteLLM models: {synced_count} active, {deleted_count} purged.")
             return {"active": synced_count, "purged": deleted_count, "success": True}
@@ -141,19 +210,89 @@ class ManagedModelService:
 
     @classmethod
     def list_all(cls, db: Session) -> Dict[str, Any]:
-        """Returns all configured models from DB and active hardware GPU nodes from Registry."""
-        db_models = db.query(ManagedModelModel).order_by(ManagedModelModel.created_at.desc()).all()
+        """
+        Returns all configured models from DB and active hardware GPU nodes from Registry,
+        ensuring bidirectional synchronization with LiteLLM Proxy.
+        """
         active_nodes = registry_client.get_nodes()
+        litellm_models = litellm_client.get_registered_models()
+        litellm_model_names = {lm.get("model_name") for lm in litellm_models if lm.get("model_name")}
 
-        models_list = [m.to_dict(mask_key=True) for m in db_models]
+        now = datetime.now(timezone.utc).isoformat()
+        active_node_ids = set()
 
+        # 1. Mirror active GPU nodes into ManagedModelModel in Postgres
+        for node in active_nodes:
+            nid = node.get("node_id")
+            if not nid:
+                continue
+            active_node_ids.add(nid)
+            db_id = f"node_{nid}"
+            is_healthy = (node.get("status") == "healthy")
+            served_name = node.get("served_model_name") or "coding-model"
+
+            existing = db.query(ManagedModelModel).filter(ManagedModelModel.id == db_id).first()
+            if not existing:
+                new_node_model = ManagedModelModel(
+                    id=db_id,
+                    name=f"نود {nid}",
+                    provider="local_node",
+                    model_id=node.get("model_name") or served_name,
+                    api_key="",
+                    api_base=node.get("api_base") or "",
+                    assigned_role=served_name,
+                    is_enabled=is_healthy,
+                    context_window=4096,
+                    created_at=now,
+                    updated_at=now,
+                )
+                db.add(new_node_model)
+            else:
+                existing.is_enabled = is_healthy
+                existing.api_base = node.get("api_base") or existing.api_base
+                existing.model_id = node.get("model_name") or existing.model_id
+                existing.assigned_role = served_name
+                existing.updated_at = now
+
+            # If node is healthy but its routes are missing in LiteLLM (e.g. after LiteLLM restart), auto-register
+            if is_healthy and served_name not in litellm_model_names:
+                cls._sync_node_to_litellm(node)
+                litellm_model_names.add(served_name)
+                litellm_model_names.add("general-model")
+
+        # 2. Deactivate any local_node records whose node is no longer in active_nodes
+        stale_nodes = db.query(ManagedModelModel).filter(
+            ManagedModelModel.provider == "local_node",
+            ManagedModelModel.is_enabled == True
+        ).all()
+        for sn in stale_nodes:
+            node_key = sn.id.replace("node_", "", 1)
+            if node_key not in active_node_ids:
+                sn.is_enabled = False
+                sn.updated_at = now
+
+        db.commit()
+
+        # 3. Retrieve all models from DB
+        db_models = db.query(ManagedModelModel).order_by(ManagedModelModel.created_at.desc()).all()
+        models_list = []
+        for m in db_models:
+            d = m.to_dict(mask_key=True)
+            # Flag if this model's role or modelId is actively registered in LiteLLM
+            d["litellmSynced"] = (m.assigned_role in litellm_model_names or m.model_id in litellm_model_names)
+            models_list.append(d)
+
+        enabled_count = len([m for m in models_list if m["isEnabled"]])
         return {
             "models": models_list,
             "activeNodes": active_nodes,
             "summary": {
                 "totalModels": len(models_list),
-                "enabledModels": len([m for m in models_list if m["isEnabled"]]),
-                "activeNodesCount": len(active_nodes),
+                "enabledModels": enabled_count,
+                "activeNodesCount": len([n for n in active_nodes if n.get("status") == "healthy"]),
+                "litellmModelsCount": len(litellm_model_names),
+                "litellmConnected": bool(litellm_model_names or litellm_client.health_check()),
+                "inSync": True,
             }
         }
 
@@ -254,13 +393,24 @@ class ManagedModelService:
 
         start_time = time.time()
         try:
-            # Send completion test to LiteLLM for this assigned role
-            res = litellm_client.chat_completion(
-                model=m.assigned_role,
-                messages=[{"role": "user", "content": "پاسخ کوتاه بده: وضعیت سیستم فعال است."}],
-                user_id="healthcheck_admin",
-                metadata={"test_ping": True, "model_id": m.id},
-            )
+            # First try completion test via assigned_role (e.g. coding-model, general-model)
+            test_targets = [m.assigned_role]
+            if m.model_id and m.model_id not in test_targets:
+                test_targets.append(m.model_id)
+
+            res = None
+            used_target = m.assigned_role
+            for target in test_targets:
+                used_target = target
+                res = litellm_client.chat_completion(
+                    model=target,
+                    messages=[{"role": "user", "content": "پاسخ کوتاه بده: وضعیت سیستم فعال است."}],
+                    user_id="healthcheck_admin",
+                    metadata={"test_ping": True, "model_id": m.id},
+                )
+                if res and "choices" in res and len(res["choices"]) > 0:
+                    break
+
             latency_ms = round((time.time() - start_time) * 1000, 1)
 
             if res and "choices" in res and len(res["choices"]) > 0:
@@ -272,6 +422,7 @@ class ManagedModelService:
                     "modelName": m.name,
                     "modelId": m.model_id,
                     "assignedRole": m.assigned_role,
+                    "testedTarget": used_target,
                     "replySnippet": reply.strip(),
                 }
             else:

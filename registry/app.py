@@ -150,6 +150,9 @@ def register_node(req: NodeRegistrationRequest):
     for r in req.supported_roles:
         if r not in all_aliases:
             all_aliases.append(r)
+    # Guarantee general-model is always registered as a fallback alias for the GPU node
+    if "general-model" not in all_aliases:
+        all_aliases.append("general-model")
     models_to_register = all_aliases
 
     sync_results = {}

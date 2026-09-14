@@ -248,21 +248,48 @@ class ChatService:
                     yield f"event: citation\ndata: {json.dumps(cit, ensure_ascii=False)}\n\n"
 
                 # 6. Active Role Mapping & System Prompt
-                try:
-                    active_roles = {m.assigned_role for m in db.query(ManagedModelModel).filter(ManagedModelModel.is_enabled == True).all()}
-                except Exception:
-                    active_roles = {"general-model"}
+                # Query actual live models from LiteLLM Proxy, Registry Nodes, and DB
+                live_litellm_models = set(litellm_client.get_available_model_names())
 
-                if detected_route == "coding" and "coding-model" in active_roles:
+                db_active_roles = set()
+                try:
+                    db_active_roles = {m.assigned_role for m in db.query(ManagedModelModel).filter(ManagedModelModel.is_enabled == True).all()}
+                except Exception:
+                    pass
+
+                node_active_roles = set()
+                try:
+                    from app.integrations.registry import registry_client
+                    for n in registry_client.get_nodes():
+                        if n.get("status") == "healthy":
+                            if n.get("served_model_name"):
+                                node_active_roles.add(n["served_model_name"])
+                            for r in n.get("supported_roles", []):
+                                node_active_roles.add(r)
+                            node_active_roles.add("general-model")
+                except Exception:
+                    pass
+
+                # Unified pool of all available roles/models across the entire sovereign stack
+                all_active_roles = live_litellm_models.union(db_active_roles).union(node_active_roles)
+
+                target_model = None
+                if detected_route == "coding" and "coding-model" in all_active_roles:
                     target_model = "coding-model"
-                elif detected_route == "reasoning" and "reasoning-model" in active_roles:
+                elif detected_route == "reasoning" and "reasoning-model" in all_active_roles:
                     target_model = "reasoning-model"
-                elif detected_route == "rag" and explicit_use_rag is True and "rag-model" in active_roles:
+                elif detected_route == "rag" and explicit_use_rag is True and "rag-model" in all_active_roles:
                     target_model = "rag-model"
-                elif "general-model" in active_roles:
+                elif "general-model" in all_active_roles:
                     target_model = "general-model"
-                elif active_roles:
-                    target_model = next(iter(active_roles))
+                elif "coding-model" in all_active_roles:
+                    target_model = "coding-model"
+                elif "reasoning-model" in all_active_roles:
+                    target_model = "reasoning-model"
+                elif live_litellm_models:
+                    target_model = next(iter(live_litellm_models))
+                elif all_active_roles:
+                    target_model = next(iter(all_active_roles))
                 else:
                     target_model = "general-model"
 
@@ -334,44 +361,52 @@ class ChatService:
                                 yield f"event: delta\ndata: {json.dumps({'type': 'delta', 'requestId': req_id, 'text': ev_text, 'content': stream_parser.accumulated_answer.strip()}, ensure_ascii=False)}\n\n"
                                 await asyncio.sleep(0.025)
 
-                # Fallback to general-model if specialized role did not respond
-                if not is_connected and target_model != "general-model":
-                    logger.info(f"Target role '{target_model}' stream did not respond; falling back to 'general-model'...")
-                    fb_gen = litellm_client.chat_completion_stream(
-                        model="general-model",
-                        messages=chat_messages,
-                        user_id=user.get("id", "u_admin"),
-                        metadata={
-                            "route": detected_route,
-                            "fallback_from": target_model,
-                            "use_rag": explicit_use_rag,
-                            "citations_count": len(real_citations),
-                            "user_email": user.get("email"),
-                        },
-                    )
-                    async for chunk in fb_gen:
-                        choices = chunk.get("choices") or []
-                        if not choices:
-                            continue
-                        delta = choices[0].get("delta") or {}
-                        reasoning_chunk = delta.get("reasoning_content") or delta.get("reasoning") or delta.get("thought")
-                        if reasoning_chunk:
-                            is_connected = True
-                            clean_rc = reasoning_chunk.replace("<think>", "").replace("</think>", "")
-                            if clean_rc:
-                                stream_parser.accumulated_thinking += clean_rc
-                                yield f"event: thinking\ndata: {json.dumps({'type': 'thinking', 'requestId': req_id, 'text': clean_rc}, ensure_ascii=False)}\n\n"
-                                await asyncio.sleep(0.015)
-                        content_chunk = delta.get("content")
-                        if content_chunk:
-                            is_connected = True
-                            for ev_type, ev_text in stream_parser.feed(content_chunk):
-                                if ev_type == "thinking":
-                                    yield f"event: thinking\ndata: {json.dumps({'type': 'thinking', 'requestId': req_id, 'text': ev_text}, ensure_ascii=False)}\n\n"
+                # Fallback to any alternative active model if target_model did not respond
+                if not is_connected:
+                    fallback_pool = []
+                    for cand in (["general-model", "coding-model", "reasoning-model"] + list(live_litellm_models) + list(all_active_roles)):
+                        if cand != target_model and cand not in fallback_pool:
+                            fallback_pool.append(cand)
+
+                    for alt_model in fallback_pool:
+                        if is_connected:
+                            break
+                        logger.info(f"Target model '{target_model}' stream did not respond; trying alternative model '{alt_model}'...")
+                        fb_gen = litellm_client.chat_completion_stream(
+                            model=alt_model,
+                            messages=chat_messages,
+                            user_id=user.get("id", "u_admin"),
+                            metadata={
+                                "route": detected_route,
+                                "fallback_from": target_model,
+                                "use_rag": explicit_use_rag,
+                                "citations_count": len(real_citations),
+                                "user_email": user.get("email"),
+                            },
+                        )
+                        async for chunk in fb_gen:
+                            choices = chunk.get("choices") or []
+                            if not choices:
+                                continue
+                            delta = choices[0].get("delta") or {}
+                            reasoning_chunk = delta.get("reasoning_content") or delta.get("reasoning") or delta.get("thought")
+                            if reasoning_chunk:
+                                is_connected = True
+                                clean_rc = reasoning_chunk.replace("<think>", "").replace("</think>", "")
+                                if clean_rc:
+                                    stream_parser.accumulated_thinking += clean_rc
+                                    yield f"event: thinking\ndata: {json.dumps({'type': 'thinking', 'requestId': req_id, 'text': clean_rc}, ensure_ascii=False)}\n\n"
                                     await asyncio.sleep(0.015)
-                                elif ev_type == "delta":
-                                    yield f"event: delta\ndata: {json.dumps({'type': 'delta', 'requestId': req_id, 'text': ev_text, 'content': stream_parser.accumulated_answer.strip()}, ensure_ascii=False)}\n\n"
-                                    await asyncio.sleep(0.025)
+                            content_chunk = delta.get("content")
+                            if content_chunk:
+                                is_connected = True
+                                for ev_type, ev_text in stream_parser.feed(content_chunk):
+                                    if ev_type == "thinking":
+                                        yield f"event: thinking\ndata: {json.dumps({'type': 'thinking', 'requestId': req_id, 'text': ev_text}, ensure_ascii=False)}\n\n"
+                                        await asyncio.sleep(0.015)
+                                    elif ev_type == "delta":
+                                        yield f"event: delta\ndata: {json.dumps({'type': 'delta', 'requestId': req_id, 'text': ev_text, 'content': stream_parser.accumulated_answer.strip()}, ensure_ascii=False)}\n\n"
+                                        await asyncio.sleep(0.025)
 
                 # Flush parser buffer
                 if is_connected:

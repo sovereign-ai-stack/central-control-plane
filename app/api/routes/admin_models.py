@@ -114,3 +114,25 @@ async def test_managed_model(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"خطا در تست اتصال مدل: {str(e)}")
 
+
+@router.post("/admin/models/sync", response_model=Dict[str, Any])
+async def sync_managed_models(
+    user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Triggers an explicit full reconciliation and sync between Database, Registry, and LiteLLM Proxy."""
+    _require_super_admin(user)
+    try:
+        res = managed_model_service.reconcile_all_models_with_litellm(db)
+        current_state = managed_model_service.list_all(db)
+        return {
+            "success": True,
+            "reconciliation": res,
+            "summary": current_state.get("summary", {}),
+            "modelsCount": len(current_state.get("models", [])),
+            "activeNodesCount": len(current_state.get("activeNodes", [])),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"خطا در همگام‌سازی با LiteLLM: {str(e)}")
+
+

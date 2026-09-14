@@ -199,8 +199,9 @@ class LiteLLMClient:
             response = await client.send(req, stream=True)
             if response.status_code != 200:
                 err_bytes = await response.aread()
-                logger.warning(
-                    f"LiteLLM stream call to {url} failed with status {response.status_code}: {err_bytes.decode('utf-8', errors='ignore')}"
+                err_msg = err_bytes.decode('utf-8', errors='ignore')
+                logger.error(
+                    f"❌ LiteLLM stream call to {url} for model '{model}' failed with status {response.status_code}: {err_msg}"
                 )
                 await response.aclose()
                 return
@@ -219,7 +220,7 @@ class LiteLLMClient:
                     continue
             await response.aclose()
         except Exception as e:
-            logger.debug(f"LiteLLM stream exception: {e}")
+            logger.error(f"LiteLLM stream exception for model '{model}': {e}")
         finally:
             await client.aclose()
 
@@ -233,6 +234,16 @@ class LiteLLMClient:
         except Exception as e:
             logger.warning(f"Error fetching models from LiteLLM proxy: {e}")
             return []
+
+    def get_available_model_names(self) -> List[str]:
+        """Returns all model names/aliases currently active and queryable in LiteLLM Proxy."""
+        models = self.get_registered_models()
+        names: List[str] = []
+        for m in models:
+            mname = m.get("model_name")
+            if mname and mname not in names:
+                names.append(mname)
+        return names
 
     def delete_model_by_id(self, model_id: str) -> bool:
         """Deletes a model from LiteLLM Proxy by its internal ID."""
