@@ -43,7 +43,7 @@ class ChatPromptBuilder:
                 "2. Immediately after </think>, provide the clean, production-ready code."
             )
 
-        if route == "rag" and explicit_use_rag is not False:
+        if route == "rag" and explicit_use_rag is True:
             if rag_context_text:
                 return (
                     "شما دستیار رسمی پایگاه دانش سازمانی (RAG) هستید.\n\n"

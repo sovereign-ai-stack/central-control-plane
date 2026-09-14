@@ -144,23 +144,36 @@ def register_node(req: NodeRegistrationRequest):
     node_port = req.port or parsed.port or (443 if parsed.scheme == "https" else 80)
 
     # Models and roles to register in LiteLLM
-    models_to_register = [req.served_model_name] + [r for r in req.supported_roles if r != req.served_model_name]
+    all_aliases = [req.served_model_name]
+    if req.model_name and req.model_name not in all_aliases:
+        all_aliases.append(req.model_name)
+    for r in req.supported_roles:
+        if r not in all_aliases:
+            all_aliases.append(r)
+    models_to_register = all_aliases
+
     sync_results = {}
     overall_ok = True
 
     for target_alias in models_to_register:
+        # The backend vLLM instance serves under served_model_name
+        vllm_target_model = req.served_model_name or req.model_name
+        safe_alias_id = target_alias.replace("/", "_").replace(":", "_")
         litellm_payload = {
             "model_name": target_alias,
             "litellm_params": {
-                "model": f"openai/{req.model_name}",
+                "model": f"openai/{vllm_target_model}",
                 "api_base": v1_base,
                 "api_key": "sk-vllm-dummy",
                 "drop_params": True,
             },
             "model_info": {
+                "id": f"{req.node_id}-{safe_alias_id}",
                 "mode": "chat",
                 "node_id": req.node_id,
                 "physical_model": req.model_name,
+                "base_model": req.model_name,
+                "description": f"GPU Node: {req.node_id} | Model: {req.model_name}",
             },
         }
 

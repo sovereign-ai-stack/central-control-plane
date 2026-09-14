@@ -167,7 +167,8 @@ class ChatService:
                     session_id=conv_id,
                 )
                 detected_route = route_result.route
-                if explicit_use_rag is False and detected_route == "rag":
+                # Strict Rule: Under NO circumstances allow RAG unless explicit_use_rag is explicitly True
+                if explicit_use_rag is not True and detected_route == "rag":
                     detected_route = "general"
                 routing_method = route_result.method
                 confidence_score = route_result.confidence
@@ -187,7 +188,7 @@ class ChatService:
                 )
 
                 # 4. Emit Dynamic Progress Stage
-                if detected_route == "rag" and explicit_use_rag is not False:
+                if detected_route == "rag" and explicit_use_rag is True:
                     org_label = "سازمان"
                     team_label = "پایگاه دانش"
                     if user_org:
@@ -198,30 +199,15 @@ class ChatService:
                         team_rec = db.query(TeamModel).filter(TeamModel.id == user_team).first()
                         if team_rec:
                             team_label = team_rec.name
-
-                    stage_label = (
-                        f"جستجوی برداری اسناد در پایگاه دانش سازمانی ({org_label} / {team_label})..."
-                        if is_fa else
-                        f"Searching vector knowledge base ({org_label} / {team_label})..."
-                    )
-                    yield f"event: progress\ndata: {json.dumps({'type': 'progress', 'requestId': req_id, 'stage': 'searching', 'label': stage_label}, ensure_ascii=False)}\n\n"
+                    progress_text = f"مسیر مکالمه: پایگاه دانش سازمانی ({org_label} / {team_label}) — استخراج برداری اسناد" if is_fa else f"Routing: Enterprise Knowledge Base ({org_label} / {team_label}) — Vector Extraction"
                 elif detected_route == "coding":
-                    stage_label = "تحلیل الگوریتم و تولید بهینه کد..." if is_fa else "Analyzing code structure and algorithm..."
-                    yield f"event: progress\ndata: {json.dumps({'type': 'progress', 'requestId': req_id, 'stage': 'reasoning', 'label': stage_label}, ensure_ascii=False)}\n\n"
+                    progress_text = "مسیر مکالمه: تولید، تحلیل و خطایابی کد — هدایت به مدل تخصصی کدنویسی" if is_fa else "Routing: Code Development & Debugging — Routing to Coding Model"
                 elif detected_route == "reasoning":
-                    stage_label = "پردازش زنجیره تفکر و استدلال منطقی..." if is_fa else "Processing deep reasoning chain..."
-                    yield f"event: progress\ndata: {json.dumps({'type': 'progress', 'requestId': req_id, 'stage': 'reasoning', 'label': stage_label}, ensure_ascii=False)}\n\n"
+                    progress_text = "مسیر مکالمه: استدلال منطقی و حل مسئله — هدایت به مدل استدلالی CoT" if is_fa else "Routing: Logical Reasoning & Problem Solving — Routing to CoT Model"
                 else:
-                    stage_label = "پردازش و تدوین پاسخ هوش مصنوعی..." if is_fa else "Generating AI response..."
-                    yield f"event: progress\ndata: {json.dumps({'type': 'progress', 'requestId': req_id, 'stage': 'reasoning', 'label': stage_label}, ensure_ascii=False)}\n\n"
+                    progress_text = "مسیر مکالمه: دستیار هوشمند عمومی — پردازش محاوره‌ای پرامپت" if is_fa else "Routing: General Conversational Assistant"
 
-                route_label_map = {
-                    "rag": "پایگاه دانش سازمانی (RAG)",
-                    "coding": "توسعه و بهینه‌سازی کد (Coding)",
-                    "reasoning": "استدلال عمیق منطقی (Deep Reasoning)",
-                    "general": "دستیار هوشمند عمومی (General)",
-                }
-                yield f"event: tool\ndata: {json.dumps({'type': 'tool', 'requestId': req_id, 'name': 'router', 'label': f'مسیر انتخابی: {route_label_map.get(detected_route, detected_route)}', 'status': 'completed', 'summary': f'درجه اطمینان: {int(confidence_score * 100)}%'}, ensure_ascii=False)}\n\n"
+                yield f"event: stage\ndata: {json.dumps({'type': 'stage', 'requestId': req_id, 'stage': 'routing', 'route': detected_route, 'confidence': confidence_score, 'method': routing_method, 'patterns': matched_patterns, 'text': progress_text}, ensure_ascii=False)}\n\n"
                 await asyncio.sleep(0.02)
 
                 # 5. Federated Vector RAG Retrieval
@@ -229,7 +215,7 @@ class ChatService:
                 rag_context_text = ""
                 rag_search_latency_ms = 0.0
 
-                if detected_route == "rag" and explicit_use_rag is not False:
+                if detected_route == "rag" and explicit_use_rag is True:
                     prev_user_queries = [m.get("content", "") for m in messages_list[:-1] if m.get("role") == "user" and m.get("content")]
                     contextual_query = f"{prev_user_queries[-1]} {payload.message}" if prev_user_queries else payload.message
 
@@ -271,14 +257,18 @@ class ChatService:
                     target_model = "coding-model"
                 elif detected_route == "reasoning" and "reasoning-model" in active_roles:
                     target_model = "reasoning-model"
-                elif detected_route == "rag" and explicit_use_rag is not False and "rag-model" in active_roles:
+                elif detected_route == "rag" and explicit_use_rag is True and "rag-model" in active_roles:
                     target_model = "rag-model"
+                elif "general-model" in active_roles:
+                    target_model = "general-model"
+                elif active_roles:
+                    target_model = next(iter(active_roles))
                 else:
                     target_model = "general-model"
 
                 system_prompt = ChatPromptBuilder.build_system_prompt(
                     route=detected_route,
-                    explicit_use_rag=explicit_use_rag,
+                    explicit_use_rag=bool(explicit_use_rag),
                     rag_context_text=rag_context_text,
                     is_fa=is_fa,
                 )

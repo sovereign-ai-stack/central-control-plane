@@ -465,18 +465,20 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
               return (
                 <Card key={node.node_id} className="bg-surface-raised border-border/40 hover:border-purple-500/40 transition-all">
                   <CardHeader className="pb-2.5 flex flex-row items-start justify-between space-y-0">
-                    <div className="space-y-1">
+                    <div className="space-y-1.5 text-right">
                       <CardTitle className="text-sm font-bold text-on-surface flex items-center gap-2">
-                        <Cpu className="size-4 text-purple-400" />
-                        <span>نود {node.node_id}</span>
+                        <Cpu className="size-4 text-purple-400 shrink-0" />
+                        <span>نود <bdi dir="ltr" className="font-mono text-brand-cyan">{node.node_id}</bdi></span>
                       </CardTitle>
-                      <div className="text-[11px] text-on-surface-variant font-mono">
-                        {node.api_base} • مدل: {node.model_name}
+                      <div className="text-[11px] text-on-surface-variant flex items-center gap-1.5 flex-wrap">
+                        <span>مدل سخت‌افزاری: <bdi dir="ltr" className="font-mono text-purple-300 font-bold">{node.model_name}</bdi></span>
+                        <span className="text-border/60">•</span>
+                        <bdi dir="ltr" className="font-mono text-[10.5px] bg-surface-container px-1.5 py-0.5 rounded text-on-surface-variant">{node.api_base}</bdi>
                       </div>
                     </div>
 
                     <Badge
-                      className={`text-[10.5px] ${
+                      className={`text-[10.5px] shrink-0 ${
                         isHealthy
                           ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                           : "bg-red-500/20 text-red-400 border-red-500/30"
@@ -487,21 +489,27 @@ export function ModelsSection({ initialModels = [] }: ModelsSectionProps) {
                   </CardHeader>
 
                   <CardContent className="space-y-2.5 text-xs">
-                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/20 text-[11px] font-mono">
-                      <div className="flex justify-between">
-                        <span className="text-on-surface-variant">پردازنده گرافیکی:</span>
-                        <span className="text-on-surface">{gpuName}</span>
+                    <div className="space-y-1.5 pt-2 border-t border-border/20 text-[11px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-on-surface-variant shrink-0">نام سرویس در LiteLLM:</span>
+                        <Badge variant="outline" className="bg-brand-cyan/15 text-brand-cyan border-brand-cyan/30 font-mono text-[11px]" dir="ltr">
+                          {node.served_model_name || "coding-model"}
+                        </Badge>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-on-surface-variant">حافظه VRAM:</span>
-                        <span className="text-purple-400">{vramGb} GB</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-on-surface-variant shrink-0">پردازنده گرافیکی:</span>
+                        <span className="text-on-surface font-mono truncate max-w-[280px]" dir="ltr">{gpuName}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-on-surface-variant shrink-0">حافظه VRAM:</span>
+                        <span className="text-purple-400 font-mono font-semibold" dir="ltr">{vramGb} GB</span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                      <span className="text-[10.5px] text-on-surface-variant">نقش‌های پشتیبانی‌شده:</span>
+                      <span className="text-[10.5px] text-on-surface-variant shrink-0">نقش‌های هدایت پرامپت:</span>
                       {node.supported_roles?.map((role) => (
-                        <Badge key={role} variant="outline" className="text-[9.5px] font-mono border-border/40 bg-surface-container">
+                        <Badge key={role} variant="outline" className="text-[9.5px] font-mono border-emerald-500/30 bg-emerald-500/10 text-emerald-400" dir="ltr">
                           {role}
                         </Badge>
                       ))}
