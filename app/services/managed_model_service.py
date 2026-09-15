@@ -57,7 +57,7 @@ class ManagedModelService:
 
     @classmethod
     def _sync_node_to_litellm(cls, node: Dict[str, Any]) -> bool:
-        """Registers all roles and aliases of an active GPU node into LiteLLM Proxy."""
+        """Registers only functional system roles of an active GPU node into LiteLLM Proxy."""
         node_id = node.get("node_id")
         if not node_id:
             return False
@@ -69,28 +69,30 @@ class ManagedModelService:
         served_model = node.get("served_model_name") or "coding-model"
         physical_model = node.get("model_name") or served_model
 
-        aliases = [served_model]
-        if physical_model not in aliases:
-            aliases.append(physical_model)
+        # Only register functional roles (e.g. general-model, coding-model, reasoning-model, rag-model)
+        # Physical model name and served model name are kept cleanly in model_info metadata.
+        roles: List[str] = []
         for r in node.get("supported_roles", []):
-            if r not in aliases:
-                aliases.append(r)
-        # Always guarantee general-model is registered as an alias so general queries work
-        if "general-model" not in aliases:
-            aliases.append("general-model")
+            if r and r not in roles:
+                roles.append(r)
+
+        # Guarantee at least general-model if no specific roles provided
+        if not roles:
+            roles.append("general-model")
 
         all_ok = True
-        for target_alias in aliases:
+        for role in roles:
             model_info = {
-                "id": f"{node_id}-{target_alias.replace('/', '_').replace(':', '_')}",
+                "id": f"{node_id}-{role.replace('/', '_').replace(':', '_')}",
                 "mode": "chat",
                 "node_id": node_id,
                 "provider": "local_node",
                 "physical_model": physical_model,
+                "served_model": served_model,
                 "description": f"GPU Node: {node_id} | Model: {physical_model}",
             }
             ok = litellm_client.register_model(
-                model_name=target_alias,
+                model_name=role,
                 litellm_model=f"openai/{served_model}",
                 api_key="sk-vllm-dummy",
                 api_base=v1_base,
@@ -128,11 +130,19 @@ class ManagedModelService:
                 db_mid = m_info.get("db_model_id")
                 node_id = m_info.get("node_id")
 
-                # If it's an active GPU node, verify the node is still alive
+                # If it's an active GPU node, verify the node is still alive and model_name is a valid role
                 if node_id:
-                    if node_id not in active_node_ids and lid:
-                        litellm_client.delete_model_by_id(lid)
-                        deleted_count += 1
+                    if node_id not in active_node_ids:
+                        if lid:
+                            litellm_client.delete_model_by_id(lid)
+                            deleted_count += 1
+                    else:
+                        matched_nodes = [n for n in healthy_nodes if n.get("node_id") == node_id]
+                        if matched_nodes:
+                            node_roles = matched_nodes[0].get("supported_roles", []) or ["general-model"]
+                            if lm.get("model_name") not in node_roles and lid:
+                                litellm_client.delete_model_by_id(lid)
+                                deleted_count += 1
                     continue
 
                 # If this model was managed by DB, check if it's still enabled and role matches
@@ -238,6 +248,9 @@ class ManagedModelService:
             is_healthy = (node.get("status") == "healthy")
             served_name = node.get("served_model_name") or "coding-model"
 
+            roles = node.get("supported_roles", [])
+            primary_role = roles[0] if roles else "general-model"
+
             existing = db.query(ManagedModelModel).filter(ManagedModelModel.id == db_id).first()
             if not existing:
                 new_node_model = ManagedModelModel(
@@ -247,17 +260,17 @@ class ManagedModelService:
                     model_id=node.get("model_name") or served_name,
                     api_key="",
                     api_base=node.get("api_base") or "",
-                    assigned_role=served_name,
+                    assigned_role=primary_role,
                     is_enabled=is_healthy,
                     context_window=4096,
                     created_at=now,
                     updated_at=now,
                 )
                 db.add(new_node_model)
-                if is_healthy and served_name not in litellm_model_names:
+                if is_healthy:
                     cls._sync_node_to_litellm(node)
-                    litellm_model_names.add(served_name)
-                    litellm_model_names.add("general-model")
+                    for r in (roles or ["general-model"]):
+                        litellm_model_names.add(r)
             else:
                 # If hardware is offline, force disable
                 if not is_healthy:
@@ -265,14 +278,14 @@ class ManagedModelService:
                 # If hardware is healthy, keep existing.is_enabled (respecting user's manual toggle switch)
                 existing.api_base = node.get("api_base") or existing.api_base
                 existing.model_id = node.get("model_name") or existing.model_id
-                existing.assigned_role = served_name
+                existing.assigned_role = primary_role
                 existing.updated_at = now
 
                 # If healthy and enabled, ensure synced to LiteLLM
-                if existing.is_enabled and served_name not in litellm_model_names:
+                if existing.is_enabled:
                     cls._sync_node_to_litellm(node)
-                    litellm_model_names.add(served_name)
-                    litellm_model_names.add("general-model")
+                    for r in (roles or ["general-model"]):
+                        litellm_model_names.add(r)
 
         # 2. Deactivate any local_node records whose node is no longer in active_nodes
         stale_nodes = db.query(ManagedModelModel).filter(
