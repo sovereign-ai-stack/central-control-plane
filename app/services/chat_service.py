@@ -360,7 +360,6 @@ class ChatService:
                         "organization_id": user_org,
                         "team_id": user_team,
                     },
-                    max_tokens=2048,
                     temperature=0.7,
                     presence_penalty=0.15,
                     frequency_penalty=0.25,

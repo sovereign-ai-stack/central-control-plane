@@ -154,7 +154,7 @@ class LiteLLMClient:
         messages: List[Dict[str, str]],
         user_id: str,
         metadata: Optional[Dict[str, Any]] = None,
-        max_tokens: int = 2048,
+        max_tokens: Optional[int] = None,
         temperature: float = 0.7,
         presence_penalty: float = 0.15,
         frequency_penalty: float = 0.25,
@@ -163,11 +163,12 @@ class LiteLLMClient:
             "model": model,
             "messages": messages,
             "user": user_id,
-            "max_tokens": max_tokens,
             "temperature": temperature,
             "presence_penalty": presence_penalty,
             "frequency_penalty": frequency_penalty,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         if metadata:
             payload["metadata"] = metadata
         return http_call(
@@ -184,7 +185,7 @@ class LiteLLMClient:
         messages: List[Dict[str, str]],
         user_id: str,
         metadata: Optional[Dict[str, Any]] = None,
-        max_tokens: int = 2048,
+        max_tokens: Optional[int] = None,
         temperature: float = 0.7,
         presence_penalty: float = 0.15,
         frequency_penalty: float = 0.25,
@@ -197,11 +198,12 @@ class LiteLLMClient:
             "messages": messages,
             "user": user_id,
             "stream": True,
-            "max_tokens": max_tokens,
             "temperature": temperature,
             "presence_penalty": presence_penalty,
             "frequency_penalty": frequency_penalty,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         if metadata:
             payload["metadata"] = metadata
 
