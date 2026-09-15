@@ -143,17 +143,21 @@ def register_node(req: NodeRegistrationRequest):
     node_ip = req.ip or parsed.hostname or "127.0.0.1"
     node_port = req.port or parsed.port or (443 if parsed.scheme == "https" else 80)
 
-    # Models and roles to register in LiteLLM
-    all_aliases = [req.served_model_name]
-    if req.model_name and req.model_name not in all_aliases:
-        all_aliases.append(req.model_name)
-    for r in req.supported_roles:
-        if r not in all_aliases:
-            all_aliases.append(r)
-    # Guarantee general-model is always registered as a fallback alias for the GPU node
-    if "general-model" not in all_aliases:
-        all_aliases.append("general-model")
-    models_to_register = all_aliases
+    # ── WHAT TO REGISTER IN LITELLM ─────────────────────────────────────────
+    # Public aliases = only the supported_roles (e.g. "general-model", "coding-model").
+    # These are what CLIENT code uses in model= field.
+    #
+    # We do NOT register served_model_name ("qwen-coder-0.5b") or model_name
+    # ("Qwen/Qwen2.5-Coder-0.5B-Instruct") as public aliases because:
+    #   1. served_model_name is the vLLM-internal name (used in litellm_params.model)
+    #   2. Exposing it as a public name creates duplicate/confusing records in LiteLLM
+    #   3. Clients should always address models by role, not by internal server name
+    #
+    # Flow:  client (role) → LiteLLM → vLLM (served_model_name)
+    roles = [r for r in req.supported_roles if r]
+    if not roles:
+        roles = ["general-model"]
+    models_to_register = roles
 
     sync_results = {}
     overall_ok = True
