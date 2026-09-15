@@ -43,8 +43,8 @@ export function TokenQuotaCard({
       : "bg-gradient-to-r from-brand-cyan to-emerald-400";
 
   return (
-    <Card className="lg:col-span-2 bg-surface-raised border-border/40">
-      <CardHeader className="pb-3 border-b border-border/30">
+    <Card className="lg:col-span-2 bg-surface-raised border-border/40 flex flex-col h-full">
+      <CardHeader className="pb-3 border-b border-border/30 shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-bold text-on-surface flex items-center gap-2">
             <BarChart3 className="size-4 text-brand-cyan" />
@@ -68,9 +68,9 @@ export function TokenQuotaCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 pt-4">
+      <CardContent className="space-y-4 pt-4 flex-1 flex flex-col justify-center">
         {/* Master Progress Bar */}
-        <div className="space-y-2 bg-surface-container/30 border border-border/30 rounded-2xl p-4">
+        <div className="space-y-3 bg-surface-container/30 border border-border/30 rounded-2xl p-4">
           <div className="flex justify-between text-xs">
             <span className="text-on-surface-variant flex items-center gap-1.5">
               <Activity className="size-3.5 text-brand-cyan" />
@@ -81,7 +81,7 @@ export function TokenQuotaCard({
             </span>
           </div>
 
-          <div className="h-3.5 w-full rounded-full bg-surface-container overflow-hidden p-0.5 border border-border/20">
+          <div className="h-4 w-full rounded-full bg-surface-container overflow-hidden p-0.5 border border-border/20">
             <div
               className={`h-full rounded-full transition-all duration-700 ${progressGradientClass}`}
               style={{ width: `${Math.max(2, Math.min(100, usedPercent))}%` }}
@@ -98,40 +98,26 @@ export function TokenQuotaCard({
 
         {/* 3-Tier Multi-Level Explanation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="p-3 rounded-xl bg-surface-container/40 border border-brand-cyan/20 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-brand-cyan">۱. سقف سازمان</span>
-              <Badge variant="outline" className="text-[9px] font-mono border-brand-cyan/30 text-brand-cyan">
-                Ceiling
-              </Badge>
+          <div className="bg-surface-container/20 border border-border/30 rounded-xl p-3 text-center flex flex-col justify-center hover:bg-surface-container/40 transition-colors">
+            <div className="text-[10px] text-on-surface-variant mb-1 font-bold">سطح سازمان (Global)</div>
+            <div className="font-mono text-sm font-black text-brand-cyan mb-1.5">{maxRps} RPS</div>
+            <div className="text-[10px] text-on-surface-variant leading-relaxed">
+              ترافیک کل سیستم کنترل و توزیع می‌شود (Global Rate Limiting).
             </div>
-            <p className="text-[10.5px] text-on-surface-variant leading-normal">
-              سقف حداکثری کل ماهانه سازمان. مجموع سهمیه تیم‌ها نمی‌تواند از این رقم تجاوز کند.
-            </p>
           </div>
-
-          <div className="p-3 rounded-xl bg-surface-container/40 border border-warning/20 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-warning">۲. سهمیه تیم‌ها</span>
-              <Badge variant="outline" className="text-[9px] font-mono border-warning/30 text-warning">
-                Allocation
-              </Badge>
+          <div className="bg-surface-container/20 border border-border/30 rounded-xl p-3 text-center flex flex-col justify-center hover:bg-surface-container/40 transition-colors">
+            <div className="text-[10px] text-on-surface-variant mb-1 font-bold">سطح تیم (Team)</div>
+            <div className="font-mono text-sm font-black text-emerald-400 mb-1.5">{inferenceConcurrency} Conc.</div>
+            <div className="text-[10px] text-on-surface-variant leading-relaxed">
+              سقف پردازش‌های همزمان و سهمیه توکن اشتراکی تیم.
             </div>
-            <p className="text-[10.5px] text-on-surface-variant leading-normal">
-              بودجه تخصیصی به هر واحد یا دپارتمان جهت جلوگیری از مصرف انحصاری و بی‌رویه.
-            </p>
           </div>
-
-          <div className="p-3 rounded-xl bg-surface-container/40 border border-info/20 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-info">۳. سقف کاربر</span>
-              <Badge variant="outline" className="text-[9px] font-mono border-info/30 text-info">
-                User Limit
-              </Badge>
+          <div className="bg-surface-container/20 border border-border/30 rounded-xl p-3 text-center flex flex-col justify-center hover:bg-surface-container/40 transition-colors">
+            <div className="text-[10px] text-on-surface-variant mb-1 font-bold">سطح کاربر (User)</div>
+            <div className="font-mono text-sm font-black text-purple-400 mb-1.5">{messagesPerHour} Msg/hr</div>
+            <div className="text-[10px] text-on-surface-variant leading-relaxed">
+              سقف پیام‌ها و محدودیت صفحات RAG (Max {maxPdfPages} pages).
             </div>
-            <p className="text-[10.5px] text-on-surface-variant leading-normal">
-              محدودیت مصرف ماهانه هر حساب کاربری در تیم برای تضمین عدالت مصرف منابع.
-            </p>
           </div>
         </div>
 

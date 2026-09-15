@@ -76,29 +76,22 @@ export function AuthScreen({ language, onAuthenticated }: AuthScreenProps) {
 
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-canvas">
-      {/* Background disabled shell view */}
-      <div className="pointer-events-none absolute inset-0 flex select-none opacity-40 blur-[1px]">
-        <ChatRail
-          language={language}
-          conversations={[]}
-          activeConversationId={undefined}
-          onSelectConversation={() => undefined}
-          onNewChat={() => undefined}
-          onShareConversation={() => undefined}
-          onRenameConversation={() => undefined}
-          onDeleteConversation={() => undefined}
-          onOpenAccount={() => undefined}
-          onToggleLanguage={() => undefined}
+      {/* Modern Grid & Glow Background */}
+      <div className="absolute inset-0 z-0 bg-zinc-950 overflow-hidden">
+        {/* Interactive-looking Grid */}
+        <div 
+          className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:32px_32px]"
+          style={{
+            maskImage: "radial-gradient(ellipse 80% 50% at 50% 50%, #000 30%, transparent 100%)",
+            WebkitMaskImage: "radial-gradient(ellipse 80% 50% at 50% 50%, #000 30%, transparent 100%)",
+          }}
         />
-        <div className="flex flex-1 flex-col">
-          <EmptyChat language={language} onSelectStarter={() => undefined} />
-          <Composer
-            language={language}
-            onSubmit={() => undefined}
-            isStreaming={false}
-            disabled={true}
-          />
-        </div>
+        {/* Glowing Orbs */}
+        <div className="absolute top-1/4 -left-32 w-[500px] h-[500px] bg-brand-cyan/15 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '7s' }} />
+        <div className="absolute -bottom-32 -right-32 w-[600px] h-[600px] bg-brand-mint/10 rounded-full blur-[150px] animate-pulse" style={{ animationDuration: '5s' }} />
+        
+        {/* Subtle grid animation overlay */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-brand-cyan/5 to-transparent opacity-50" />
       </div>
 
       {/* Central Login Modal */}

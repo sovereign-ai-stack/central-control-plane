@@ -142,9 +142,16 @@ export function CodeBlock({
     >
       {/* Code Header bar */}
       <div className="flex justify-between items-center bg-[#161b22]/90 px-4 py-1.5 border-b border-white/5 select-none">
-        <span className="text-[12px] font-medium text-slate-400 lowercase font-sans">
-          {title}
-        </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-full bg-red-500/80 inline-block"></span>
+            <span className="size-2.5 rounded-full bg-yellow-500/80 inline-block"></span>
+            <span className="size-2.5 rounded-full bg-emerald-500/80 inline-block"></span>
+          </div>
+          <span className="text-[12px] font-medium text-slate-400 lowercase font-sans">
+            {title}
+          </span>
+        </div>
         <button
           type="button"
           onClick={onCopy}

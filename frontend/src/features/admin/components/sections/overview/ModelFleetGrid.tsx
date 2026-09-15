@@ -56,11 +56,14 @@ export function ModelFleetGrid({
         {models && models.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
             {models.map((m: any, idx: number) => {
-              const roleBadge = getRoleBadge(m.id || m.served_model_name || m.assignedRole);
+              const roleBadge = getRoleBadge(m.id || m.assignedRole || m.served_model_name);
               const modelTitle = m.name || m.model_name || m.id || `Model #${idx + 1}`;
-              const gpuName = m.gpu || m.hardware?.gpus?.[0]?.name || "NVIDIA GPU";
-              const nodeId = m.nodeId || m.node_id || `node-${idx + 1}`;
-              const endpoint = m.ip && m.port ? `${m.ip}:${m.port}` : (m.api_base || "127.0.0.1:8000");
+              
+              // Distinguish between Local Hardware Node and Cloud Model
+              const isCloud = m.provider && m.provider !== "local_node" && m.provider !== "litellm_proxy";
+              const hardwareName = isCloud ? `Cloud API (${m.provider})` : (m.gpu || m.hardware?.gpus?.[0]?.name || "NVIDIA GPU");
+              const hostName = isCloud ? "Managed Cloud Service" : (m.nodeId || m.node_id || `node-${idx + 1}`);
+              const endpoint = isCloud ? "External API Endpoint" : (m.ip && m.port ? `${m.ip}:${m.port}` : (m.api_base || "127.0.0.1:8000"));
 
               return (
                 <div
@@ -83,15 +86,15 @@ export function ModelFleetGrid({
                     </div>
                     <div className="text-[11px] text-on-surface-variant flex items-center gap-1 mt-0.5 font-mono">
                       <Server className="size-3 text-brand-cyan shrink-0" />
-                      <span className="truncate">{nodeId}</span>
+                      <span className="truncate">{hostName}</span>
                     </div>
                   </div>
 
                   <div className="pt-1.5 border-t border-border/20 space-y-1 text-[10.5px] text-on-surface-variant font-mono">
                     <div className="flex items-center justify-between">
                       <span className="flex items-center gap-1">
-                        <HardDrive className="size-3 text-warning shrink-0" />
-                        <span className="truncate max-w-[120px]" title={gpuName}>{gpuName}</span>
+                        <HardDrive className={`size-3 shrink-0 ${isCloud ? "text-purple-400" : "text-warning"}`} />
+                        <span className="truncate max-w-[120px]" title={hardwareName}>{hardwareName}</span>
                       </span>
                       <span className="text-on-surface font-semibold">{m.latencyMs ? `${m.latencyMs}ms` : "Live"}</span>
                     </div>
