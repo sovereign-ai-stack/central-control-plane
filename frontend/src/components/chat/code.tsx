@@ -135,46 +135,39 @@ export function CodeBlock({
       aria-label="Code snippet"
       data-slot="code-block"
       className={cn(
-        "bg-[#0d1117] rounded-xl my-4 overflow-hidden shadow-md shadow-black/30 border border-border/40 text-left font-mono",
+        "bg-[#0d1117] rounded-xl my-5 overflow-hidden border border-white/10 text-left shadow-sm",
         className
       )}
       {...props}
     >
       {/* Code Header bar */}
-      <div className="flex justify-between items-center bg-[#161b22] px-4 py-2 border-b border-border/25 select-none">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-full bg-red-500/60 inline-block"></span>
-            <span className="size-2.5 rounded-full bg-yellow-500/60 inline-block"></span>
-            <span className="size-2.5 rounded-full bg-emerald-500/60 inline-block"></span>
-          </div>
-          <span className="text-[12px] font-semibold text-on-surface-variant font-mono uppercase tracking-wider ml-1">
-            {title}
-          </span>
-        </div>
+      <div className="flex justify-between items-center bg-[#161b22]/90 px-4 py-1.5 border-b border-white/5 select-none">
+        <span className="text-[12px] font-medium text-slate-400 lowercase font-sans">
+          {title}
+        </span>
         <button
           type="button"
           onClick={onCopy}
-          className="text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1.5 text-[12px] bg-white/5 hover:bg-white/10 px-2.5 py-1 rounded-md border border-white/10 cursor-pointer active:scale-95"
+          className="text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1.5 text-[12px] font-sans px-2 py-1 rounded-md cursor-pointer active:scale-95"
           aria-label="Copy code"
         >
           {copied ? (
             <>
               <Check className="size-3.5 text-emerald-400" />
-              <span className="text-emerald-400 text-xs font-semibold">Copied!</span>
+              <span className="text-emerald-400">Copied!</span>
             </>
           ) : (
             <>
               <Copy className="size-3.5" />
-              <span className="text-xs">Copy</span>
+              <span>Copy code</span>
             </>
           )}
         </button>
       </div>
 
-      {/* Code Body with tight, readable developer line height */}
-      <div className="p-4 overflow-x-auto bg-[#090d13]">
-        <pre className="font-mono text-[13px] leading-[1.65] tracking-normal whitespace-pre [unicode-bidi:isolate] text-slate-200">
+      {/* Code Body */}
+      <div className="p-4 overflow-x-auto bg-[#0d1117]">
+        <pre className="font-mono text-[13.5px] leading-[1.6] tracking-tight whitespace-pre [unicode-bidi:isolate] text-slate-200">
           <code dir="ltr" className="font-mono">{highlightedCode}</code>
         </pre>
       </div>

@@ -198,58 +198,8 @@ class ManagedModelService:
                 cls._sync_node_to_litellm(node)
                 synced_count += 1
 
-            # 5. Guarantee all standard roles have a working backend dynamically
-            standard_roles = ["general-model", "coding-model", "reasoning-model", "rag-model"]
-            fresh_litellm_models = litellm_client.get_registered_models()
-            active_roles = {lm.get("model_name") for lm in fresh_litellm_models if lm.get("model_name")}
-
-            # Choose fallback source: First prefer enabled DB model, then allowed GPU node
-            if enabled_models:
-                fallback_source = enabled_models[0]
-                for r in standard_roles:
-                    if r not in active_roles:
-                        litellm_model = cls._format_litellm_model_string(fallback_source.provider, fallback_source.model_id)
-                        litellm_client.register_model(
-                            model_name=r,
-                            litellm_model=litellm_model,
-                            api_key=fallback_source.api_key or None,
-                            api_base=fallback_source.api_base or None,
-                            model_info={
-                                "mode": "chat",
-                                "db_model_id": fallback_source.id,
-                                "provider": fallback_source.provider,
-                                "physical_model": fallback_source.model_id,
-                                "context_window": fallback_source.context_window,
-                            },
-                        )
-            elif allowed_nodes:
-                fallback_node = allowed_nodes[0]
-                f_api_base = fallback_node.get("api_base", "").rstrip("/")
-                f_v1 = f_api_base if f_api_base.endswith("/v1") else f"{f_api_base}/v1"
-                # FIX: must use the real served_model_name, not a role name fallback
-                f_served = (fallback_node.get("served_model_name") or "").strip()
-                if not f_served:
-                    logger.warning(
-                        f"Fallback node '{fallback_node.get('node_id')}' has no served_model_name "
-                        f"— skipping standard role fallback registration."
-                    )
-                else:
-                    for r in standard_roles:
-                        if r not in active_roles:
-                            litellm_client.register_model(
-                                model_name=r,
-                                litellm_model=f"openai/{f_served}",
-                                api_key="sk-vllm-dummy",
-                                api_base=f_v1,
-                                model_info={
-                                    "mode": "chat",
-                                    "node_id": fallback_node.get("node_id"),
-                                    "provider": "local_node",
-                                    "physical_model": fallback_node.get("model_name"),
-                                    "served_model": f_served,
-                                    "description": f"Fallback role {r} mapped to node {fallback_node.get('node_id')} (model: {f_served})",
-                                },
-                            )
+            # Fallbacks are handled dynamically at runtime in chat_service.py
+            # so we do NOT statically pollute LiteLLM with unselected roles.
 
             logger.info(f"Reconciled LiteLLM models: {synced_count} active, {deleted_count} purged.")
             return {"active": synced_count, "purged": deleted_count, "success": True}
