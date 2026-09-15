@@ -57,7 +57,14 @@ class ManagedModelService:
 
     @classmethod
     def _sync_node_to_litellm(cls, node: Dict[str, Any]) -> bool:
-        """Registers only functional system roles of an active GPU node into LiteLLM Proxy."""
+        """Registers only functional system roles of an active GPU node into LiteLLM Proxy.
+
+        Maps each supported_role (public alias used by clients, e.g. 'general-model')
+        to the real served_model_name that vLLM was started with (e.g. 'qwen3-1.7b').
+
+        Flow:
+            User → LiteLLM (model_name=role) → vLLM (model=served_model_name) ✅
+        """
         node_id = node.get("node_id")
         if not node_id:
             return False
@@ -66,13 +73,24 @@ class ManagedModelService:
             return False
         v1_base = api_base if api_base.endswith("/v1") else f"{api_base}/v1"
 
-        served_model = node.get("served_model_name") or "coding-model"
-        physical_model = node.get("model_name") or served_model
+        # ── FIX: served_model_name is the exact name vLLM was started with via
+        #         --served-model-name. It MUST NOT fall back to a role name like
+        #         "coding-model" because vLLM won't recognise it and returns 404.
+        served_model = (node.get("served_model_name") or "").strip()
+        if not served_model:
+            logger.warning(
+                f"Node '{node_id}' has no served_model_name — skipping LiteLLM registration "
+                f"to avoid sending a wrong model string to vLLM."
+            )
+            return False
 
-        # Only register functional roles (e.g. general-model, coding-model, reasoning-model, rag-model)
-        # Physical model name and served model name are kept cleanly in model_info metadata.
+        # model_name is the human-readable HuggingFace name (for metadata/display only)
+        physical_model = (node.get("model_name") or served_model).strip()
+
+        # Collect supported roles (public aliases exposed to clients)
         roles: List[str] = []
         for r in node.get("supported_roles", []):
+            r = (r or "").strip()
             if r and r not in roles:
                 roles.append(r)
 
@@ -83,22 +101,28 @@ class ManagedModelService:
         all_ok = True
         for role in roles:
             model_info = {
+                # Unique ID per (node, role) pair — used for cleanup in reconcile
                 "id": f"{node_id}-{role.replace('/', '_').replace(':', '_')}",
                 "mode": "chat",
                 "node_id": node_id,
                 "provider": "local_node",
                 "physical_model": physical_model,
+                # served_model is what LiteLLM will forward to vLLM as the model field
                 "served_model": served_model,
-                "description": f"GPU Node: {node_id} | Model: {physical_model}",
+                "description": f"GPU Node: {node_id} | Role: {role} → vLLM model: {served_model}",
             }
+            logger.debug(
+                f"Registering LiteLLM route: '{role}' → openai/{served_model} @ {v1_base} (node={node_id})"
+            )
             ok = litellm_client.register_model(
-                model_name=role,
-                litellm_model=f"openai/{served_model}",
+                model_name=role,                         # Public alias clients use
+                litellm_model=f"openai/{served_model}",  # Actual name vLLM knows ✅
                 api_key="sk-vllm-dummy",
                 api_base=v1_base,
                 model_info=model_info,
             )
             if not ok:
+                logger.warning(f"Failed to register role '{role}' → '{served_model}' for node '{node_id}'")
                 all_ok = False
         return all_ok
 
@@ -202,22 +226,30 @@ class ManagedModelService:
                 fallback_node = allowed_nodes[0]
                 f_api_base = fallback_node.get("api_base", "").rstrip("/")
                 f_v1 = f_api_base if f_api_base.endswith("/v1") else f"{f_api_base}/v1"
-                f_served = fallback_node.get("served_model_name") or "coding-model"
-                for r in standard_roles:
-                    if r not in active_roles:
-                        litellm_client.register_model(
-                            model_name=r,
-                            litellm_model=f"openai/{f_served}",
-                            api_key="sk-vllm-dummy",
-                            api_base=f_v1,
-                            model_info={
-                                "mode": "chat",
-                                "node_id": fallback_node.get("node_id"),
-                                "provider": "local_node",
-                                "physical_model": fallback_node.get("model_name"),
-                                "description": f"Fallback role {r} mapped to node {fallback_node.get('node_id')}",
-                            },
-                        )
+                # FIX: must use the real served_model_name, not a role name fallback
+                f_served = (fallback_node.get("served_model_name") or "").strip()
+                if not f_served:
+                    logger.warning(
+                        f"Fallback node '{fallback_node.get('node_id')}' has no served_model_name "
+                        f"— skipping standard role fallback registration."
+                    )
+                else:
+                    for r in standard_roles:
+                        if r not in active_roles:
+                            litellm_client.register_model(
+                                model_name=r,
+                                litellm_model=f"openai/{f_served}",
+                                api_key="sk-vllm-dummy",
+                                api_base=f_v1,
+                                model_info={
+                                    "mode": "chat",
+                                    "node_id": fallback_node.get("node_id"),
+                                    "provider": "local_node",
+                                    "physical_model": fallback_node.get("model_name"),
+                                    "served_model": f_served,
+                                    "description": f"Fallback role {r} mapped to node {fallback_node.get('node_id')} (model: {f_served})",
+                                },
+                            )
 
             logger.info(f"Reconciled LiteLLM models: {synced_count} active, {deleted_count} purged.")
             return {"active": synced_count, "purged": deleted_count, "success": True}
