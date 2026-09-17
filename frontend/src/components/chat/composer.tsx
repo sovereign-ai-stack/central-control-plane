@@ -86,6 +86,7 @@ export function Composer({
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const dragCounterRef = React.useRef(0);
   const baseTextRef = React.useRef("");
+  
   const { isRecording: isRecordingDictation, start: startSpeech, stop: stopSpeech } = useSpeechRecognition({
     language,
     onResult: (transcript) => {
@@ -149,16 +150,16 @@ export function Composer({
     if (!onUploadPdf) return;
 
     if (attachments.length >= 3) {
-      toast.error(language === "fa" ? "Ø­Ø¯Ø§Ú©Ø«Ø± Û³ ÙØ§ÛŒÙ„ PDF Ù…Ø¬Ø§Ø² Ø§Ø³Øª." : "You can attach up to 3 PDFs.");
+      toast.error(language === "fa" ? "حداکثر ۳ فایل PDF مجاز است." : "You can attach up to 3 PDFs.");
       return;
     }
 
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      toast.error(language === "fa" ? "ÙÙ‚Ø· ÙØ§ÛŒÙ„ PDF Ù¾Ø´ØªÛŒØ¨Ø§Ù†ÛŒ Ù…ÛŒâ€ŒØ´ÙˆØ¯." : "Only PDF files are supported.");
+      toast.error(language === "fa" ? "فقط فایل PDF پشتیبانی می‌شود." : "Only PDF files are supported.");
       return;
     }
     if (file.size > 10_000_000) {
-      toast.error(language === "fa" ? "Ø­Ø¬Ù… PDF Ø¨Ø§ÛŒØ¯ Ú©Ù…ØªØ± Ø§Ø² Û±Û° Ù…Ú¯Ø§Ø¨Ø§ÛŒØª Ø¨Ø§Ø´Ø¯." : "PDFs must be smaller than 10 MB.");
+      toast.error(language === "fa" ? "حجم PDF باید کمتر از ۱۰ مگابایت باشد." : "PDFs must be smaller than 10 MB.");
       return;
     }
 
@@ -262,12 +263,12 @@ export function Composer({
               <AttachmentContent>
                 <AttachmentTitle>{attachment.name}</AttachmentTitle>
                 <AttachmentDescription>
-                  PDF Â· {((attachment.size || 0) / 1_000_000).toFixed(1)} MB
+                  PDF · {((attachment.size || 0) / 1_000_000).toFixed(1)} MB
                 </AttachmentDescription>
               </AttachmentContent>
               <AttachmentAction
                 onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))}
-                aria-label={language === "fa" ? `Ø­Ø°Ù ${attachment.name}` : `Remove ${attachment.name}`}
+                aria-label={language === "fa" ? `حذف ${attachment.name}` : `Remove ${attachment.name}`}
               >
                 <X />
               </AttachmentAction>
@@ -300,7 +301,7 @@ export function Composer({
                 <Paperclip className="size-4 animate-bounce" />
                 <span>
                   {language === "fa"
-                    ? "ÙØ§ÛŒÙ„ PDF Ø±Ø§ Ø¨Ø±Ø§ÛŒ Ù¾ÛŒÙˆØ³Øª Ø§ÛŒÙ†Ø¬Ø§ Ø±Ù‡Ø§ Ú©Ù†ÛŒØ¯"
+                    ? "فایل PDF را برای پیوست اینجا رها کنید"
                     : "Drop PDF here to attach"}
                 </span>
               </div>
@@ -327,12 +328,12 @@ export function Composer({
             placeholder={
               isRecordingDictation
                 ? language === "fa"
-                  ? "Ø¯Ø± Ø­Ø§Ù„ Ø¶Ø¨Ø· ØµØ¯Ø§â€¦ (ØµØ­Ø¨Øª Ú©Ù†ÛŒØ¯)"
-                  : "Recording speechâ€¦ (speak now)"
+                  ? "در حال ضبط صدا… (صحبت کنید)"
+                  : "Recording speech… (speak now)"
                 : isTranscribing
                   ? language === "fa"
-                    ? "Ø¯Ø± Ø­Ø§Ù„ ØªØ¨Ø¯ÛŒÙ„ Ú¯ÙØªØ§Ø± Ø¨Ù‡ Ù…ØªÙ†â€¦"
-                    : "Transcribing speechâ€¦"
+                    ? "در حال تبدیل گفتار به متن…"
+                    : "Transcribing speech…"
                   : t.composer.placeholder
             }
             disabled={disabled || isTranscribing}
@@ -345,7 +346,6 @@ export function Composer({
           {/* Right Action Group: Send / Stop Action */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 pb-0.5 relative z-10">
             <TooltipProvider delayDuration={150}>
-              {/* Primary Action on the right: Stop when streaming, Send when typed */}
               {isStreaming ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -362,15 +362,40 @@ export function Composer({
                     {t.composer.cancel}
                   </TooltipContent>
                 </Tooltip>
+              ) : isRecordingDictation || (!value.trim() && attachments.length === 0) ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={isRecordingDictation ? stopDictation : startDictation}
+                      disabled={disabled || isTranscribing}
+                      className={cn(
+                        "size-8 sm:size-9 rounded-full shrink-0 flex items-center justify-center transition-all cursor-pointer outline-none focus:outline-none",
+                        isRecordingDictation
+                          ? "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                          : "text-on-surface-variant hover:bg-surface-raised/80 hover:text-on-surface",
+                        (disabled || isTranscribing) && "opacity-50 cursor-not-allowed"
+                      )}
+                      aria-label={isRecordingDictation ? "Stop recording" : "Start recording"}
+                    >
+                      {isRecordingDictation ? <MicOff className="size-4.5" /> : <Mic className="size-4.5" />}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={6} className="text-xs">
+                    {isRecordingDictation 
+                      ? (language === "fa" ? "توقف ضبط" : "Stop recording") 
+                      : (language === "fa" ? "تبدیل صدا به متن" : "Speech to text")}
+                  </TooltipContent>
+                </Tooltip>
               ) : (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       type="submit"
-                      disabled={disabled || !value.trim()}
+                      disabled={disabled}
                       className={cn(
                         "size-8 sm:size-9 rounded-full shrink-0 flex items-center justify-center transition-all cursor-pointer shadow-md outline-none focus:outline-none",
-                        !disabled && value.trim()
+                        !disabled
                           ? "text-[#121319] bg-brand-gradient hover:opacity-90 active:scale-95 shadow-sm shadow-[#6EF0C2]/20"
                           : "bg-surface-raised/80 text-on-surface-variant/40 cursor-not-allowed opacity-50"
                       )}
@@ -397,12 +422,10 @@ export function Composer({
       <div className="text-center mt-2 sm:mt-3 px-2">
         <span className="text-[10px] sm:text-[11px] text-on-surface-variant/50 tracking-wide font-sans leading-tight">
           {language === "fa"
-            ? "Ø¯Ø³ØªÛŒØ§Ø± Ù‡ÙˆØ´Ù…Ù†Ø¯ Ø³Ø§Ø²Ù…Ø§Ù†ÛŒ Ù…Ù…Ú©Ù† Ø§Ø³Øª Ø®Ø·Ø§ Ø¯Ø§Ø´ØªÙ‡ Ø¨Ø§Ø´Ø¯. Ø§Ù‚Ø¯Ø§Ù…Ø§Øª Ø­Ø³Ø§Ø³ Ø±Ø§ Ø¨Ø±Ø±Ø³ÛŒ Ú©Ù†ÛŒØ¯."
+            ? "دستیار هوشمند سازمانی ممکن است خطا داشته باشد. اقدامات حساس را بررسی کنید."
             : "Sovereign AI can make mistakes. Verify critical actions."}
         </span>
       </div>
     </div>
   );
 }
-
-
