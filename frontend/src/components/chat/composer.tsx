@@ -44,6 +44,7 @@ export function WaveformVoiceIcon({ className = "size-4" }: { className?: string
 }
 
 import { RagToggle } from "./rag-toggle";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 
 export interface ComposerProps extends Omit<React.ComponentProps<"div">, "onSubmit"> {
   onSubmit: (message: string, attachments?: FileAttachment[], useRag?: boolean) => void;
@@ -77,17 +78,24 @@ export function Composer({
   const [internalUseRag, setInternalUseRag] = React.useState(true);
   const activeUseRag = useRag !== undefined ? useRag : internalUseRag;
   const handleToggleRag = onToggleRag || setInternalUseRag;
-  const [isRecordingDictation, setIsRecordingDictation] = React.useState(false);
   const [isTranscribing, setIsTranscribing] = React.useState(false);
   const [isUploadingPdf, setIsUploadingPdf] = React.useState(false);
   const [isDragging, setIsDragging] = React.useState(false);
   const [attachments, setAttachments] = React.useState<FileAttachment[]>([]);
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
-  const audioChunksRef = React.useRef<Blob[]>([]);
-  const streamRef = React.useRef<MediaStream | null>(null);
   const dragCounterRef = React.useRef(0);
+  const baseTextRef = React.useRef("");
+  const { isRecording: isRecordingDictation, start: startSpeech, stop: stopSpeech } = useSpeechRecognition({
+    language,
+    onResult: (transcript) => {
+      setValue(baseTextRef.current + (baseTextRef.current ? " " : "") + transcript);
+      textareaRef.current?.focus();
+    },
+    onEnd: () => {
+      setIsTranscribing(false);
+    }
+  });
 
   React.useEffect(() => {
     if (initialValue) {
@@ -106,95 +114,14 @@ export function Composer({
     el.style.height = `${nextHeight}px`;
   }, [value]);
 
-  const cleanupMediaTracks = React.useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setIsRecordingDictation(false);
-  }, []);
-
-  const startDictation = async () => {
+  const startDictation = () => {
     if (isStreaming || disabled || isTranscribing) return;
-
-    try {
-      cleanupMediaTracks();
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("MEDIA_UNSUPPORTED");
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm";
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (blob.size <= 1000) {
-          setIsTranscribing(false);
-          return;
-        }
-
-        setIsTranscribing(true);
-        try {
-          const formData = new FormData();
-          formData.append("file", blob, "dictation.webm");
-          const response = await apiFetch("voice/transcribe", {
-            method: "POST",
-            body: formData,
-          });
-          if (!response.ok) throw new Error("Transcription failed");
-
-          const data: { text: string } = await response.json();
-          if (data.text) {
-            setValue((prev) => (prev ? `${prev} ${data.text}` : data.text));
-            textareaRef.current?.focus();
-          }
-        } catch (error) {
-          console.error("Dictation error:", error);
-          toast.error(
-            language === "fa" ? "خطا در تبدیل صدا به متن." : "Speech-to-text failed."
-          );
-        } finally {
-          setIsTranscribing(false);
-        }
-      };
-
-      recorder.start(250);
-      setIsRecordingDictation(true);
-    } catch (error: unknown) {
-      console.error("Mic access error:", error);
-      const errName = error && typeof error === "object" && "name" in error ? String(error.name) : "";
-      if (errName === "NotAllowedError" || errName === "PermissionDeniedError") {
-        toast.error(
-          language === "fa"
-            ? "دسترسی به میکروفون مسدود است. لطفاً در تنظیمات مرورگر مجوز میکروفون را فعال کنید."
-            : "Microphone permission denied. Please allow microphone in browser settings."
-        );
-      } else {
-        toast.error(
-          language === "fa" ? "دسترسی به میکروفون داده نشد." : "Microphone access denied."
-        );
-      }
-      cleanupMediaTracks();
-    }
+    baseTextRef.current = value;
+    startSpeech();
   };
 
   const stopDictation = () => {
-    if (mediaRecorderRef.current?.state === "recording") {
-      mediaRecorderRef.current.stop();
-      cleanupMediaTracks();
-    }
+    stopSpeech();
   };
 
   const removeAttachment = (id: string) => {
@@ -222,16 +149,16 @@ export function Composer({
     if (!onUploadPdf) return;
 
     if (attachments.length >= 3) {
-      toast.error(language === "fa" ? "حداکثر ۳ فایل PDF مجاز است." : "You can attach up to 3 PDFs.");
+      toast.error(language === "fa" ? "Ø­Ø¯Ø§Ú©Ø«Ø± Û³ ÙØ§ÛŒÙ„ PDF Ù…Ø¬Ø§Ø² Ø§Ø³Øª." : "You can attach up to 3 PDFs.");
       return;
     }
 
     if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      toast.error(language === "fa" ? "فقط فایل PDF پشتیبانی می‌شود." : "Only PDF files are supported.");
+      toast.error(language === "fa" ? "ÙÙ‚Ø· ÙØ§ÛŒÙ„ PDF Ù¾Ø´ØªÛŒØ¨Ø§Ù†ÛŒ Ù…ÛŒâ€ŒØ´ÙˆØ¯." : "Only PDF files are supported.");
       return;
     }
     if (file.size > 10_000_000) {
-      toast.error(language === "fa" ? "حجم PDF باید کمتر از ۱۰ مگابایت باشد." : "PDFs must be smaller than 10 MB.");
+      toast.error(language === "fa" ? "Ø­Ø¬Ù… PDF Ø¨Ø§ÛŒØ¯ Ú©Ù…ØªØ± Ø§Ø² Û±Û° Ù…Ú¯Ø§Ø¨Ø§ÛŒØª Ø¨Ø§Ø´Ø¯." : "PDFs must be smaller than 10 MB.");
       return;
     }
 
@@ -335,12 +262,12 @@ export function Composer({
               <AttachmentContent>
                 <AttachmentTitle>{attachment.name}</AttachmentTitle>
                 <AttachmentDescription>
-                  PDF · {((attachment.size || 0) / 1_000_000).toFixed(1)} MB
+                  PDF Â· {((attachment.size || 0) / 1_000_000).toFixed(1)} MB
                 </AttachmentDescription>
               </AttachmentContent>
               <AttachmentAction
                 onClick={() => setAttachments((prev) => prev.filter((item) => item.id !== attachment.id))}
-                aria-label={language === "fa" ? `حذف ${attachment.name}` : `Remove ${attachment.name}`}
+                aria-label={language === "fa" ? `Ø­Ø°Ù ${attachment.name}` : `Remove ${attachment.name}`}
               >
                 <X />
               </AttachmentAction>
@@ -373,7 +300,7 @@ export function Composer({
                 <Paperclip className="size-4 animate-bounce" />
                 <span>
                   {language === "fa"
-                    ? "فایل PDF را برای پیوست اینجا رها کنید"
+                    ? "ÙØ§ÛŒÙ„ PDF Ø±Ø§ Ø¨Ø±Ø§ÛŒ Ù¾ÛŒÙˆØ³Øª Ø§ÛŒÙ†Ø¬Ø§ Ø±Ù‡Ø§ Ú©Ù†ÛŒØ¯"
                     : "Drop PDF here to attach"}
                 </span>
               </div>
@@ -400,12 +327,12 @@ export function Composer({
             placeholder={
               isRecordingDictation
                 ? language === "fa"
-                  ? "در حال ضبط صدا… (صحبت کنید)"
-                  : "Recording speech… (speak now)"
+                  ? "Ø¯Ø± Ø­Ø§Ù„ Ø¶Ø¨Ø· ØµØ¯Ø§â€¦ (ØµØ­Ø¨Øª Ú©Ù†ÛŒØ¯)"
+                  : "Recording speechâ€¦ (speak now)"
                 : isTranscribing
                   ? language === "fa"
-                    ? "در حال تبدیل گفتار به متن…"
-                    : "Transcribing speech…"
+                    ? "Ø¯Ø± Ø­Ø§Ù„ ØªØ¨Ø¯ÛŒÙ„ Ú¯ÙØªØ§Ø± Ø¨Ù‡ Ù…ØªÙ†â€¦"
+                    : "Transcribing speechâ€¦"
                   : t.composer.placeholder
             }
             disabled={disabled || isTranscribing}
@@ -470,10 +397,12 @@ export function Composer({
       <div className="text-center mt-2 sm:mt-3 px-2">
         <span className="text-[10px] sm:text-[11px] text-on-surface-variant/50 tracking-wide font-sans leading-tight">
           {language === "fa"
-            ? "دستیار هوشمند سازمانی ممکن است خطا داشته باشد. اقدامات حساس را بررسی کنید."
+            ? "Ø¯Ø³ØªÛŒØ§Ø± Ù‡ÙˆØ´Ù…Ù†Ø¯ Ø³Ø§Ø²Ù…Ø§Ù†ÛŒ Ù…Ù…Ú©Ù† Ø§Ø³Øª Ø®Ø·Ø§ Ø¯Ø§Ø´ØªÙ‡ Ø¨Ø§Ø´Ø¯. Ø§Ù‚Ø¯Ø§Ù…Ø§Øª Ø­Ø³Ø§Ø³ Ø±Ø§ Ø¨Ø±Ø±Ø³ÛŒ Ú©Ù†ÛŒØ¯."
             : "Sovereign AI can make mistakes. Verify critical actions."}
         </span>
       </div>
     </div>
   );
 }
+
+
