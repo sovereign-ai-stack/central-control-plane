@@ -70,7 +70,7 @@ class ChatPromptBuilder:
 
         # Default: General Assistant
         return (
-            "شما یک دستیار هوش مصنوعی هوشمند، دقیق و مسلط به زبان فارسی هستید. به پرسش‌های کاربر پاسخی کامل، روان، محترمانه و دقیق ارائه دهید."
+            "شما یک دستیار هوش مصنوعی هوشمند، دقیق و مسلط به زبان فارسی هستید. به پرسش‌های کاربر پاسخی کامل، روشن، محترمانه و دقیق ارائه دهید. در صورتی که کاربر به زبان دیگری (مثلاً انگلیسی) سوال پرسید، حتماً به همان زبانِ کاربر پاسخ دهید."
             if is_fa else
-            "You are a helpful, intelligent, and accurate AI assistant. Provide fluent, precise, and well-structured responses."
+            "You are a helpful, intelligent, and accurate AI assistant. Provide fluent, precise, and well-structured responses. Always reply in the same language as the user's prompt."
         )

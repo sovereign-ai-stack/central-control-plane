@@ -33,7 +33,7 @@ export const ALL_NAV_ITEMS: NavItem[] = [
     label: "داشبورد و وضعیت",
     detail: "تله‌متری زنده و نودهای پردازشی",
     icon: LayoutDashboard,
-    allowedRoles: ["super_admin", "org_admin", "team_admin"],
+    allowedRoles: ["super_admin"],
   },
   {
     id: "organizations",

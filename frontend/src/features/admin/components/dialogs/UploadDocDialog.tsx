@@ -229,7 +229,7 @@ export function UploadDocDialog({
               <CustomSelect
                 value={teamId}
                 onChange={onTeamIdChange}
-                disabled={!orgId}
+                disabled={!orgId || currentUserRole === "team_admin"}
                 options={[
                   { value: "global", label: "پایگاه دانش سراسری (تمام تیم‌ها)" },
                   ...availableTeams.map((t) => ({ value: t.id, label: `تیم ${t.name}` })),

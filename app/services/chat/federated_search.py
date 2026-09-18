@@ -40,6 +40,7 @@ class FederatedSearchService:
             org_targets.add(user_org)
         if is_super:
             try:
+                from app.models.document import DocumentModel
                 doc_orgs = db.query(DocumentModel.organization_id).distinct().all()
                 for (d_org,) in doc_orgs:
                     if d_org and d_org not in ["global", "org_global", ""]:
@@ -52,11 +53,24 @@ class FederatedSearchService:
         # 2. Search target organizations
         for org_id in org_targets:
             try:
+                is_admin_for_org = is_super or (user.get("role") == "org_admin" and org_id == user_org)
+                
+                if is_admin_for_org:
+                    # Admin sees all teams in this org + global
+                    from app.models.team import TeamModel
+                    org_teams = db.query(TeamModel.id).filter(TeamModel.organization_id == org_id).all()
+                    target_allowed_teams = [t[0] for t in org_teams] + ["global"]
+                    target_team_id = None
+                else:
+                    # Regular user / Team admin sees their team + global
+                    target_allowed_teams = [user_team, "global"] if user_team else ["global"]
+                    target_team_id = user_team
+
                 chunks_org = rag_service.retrieve(
                     query=search_text,
                     organization_id=org_id,
-                    team_id=user_team if not is_super else None,
-                    allowed_team_ids=allowed_teams if not is_super else None,
+                    team_id=target_team_id,
+                    allowed_team_ids=target_allowed_teams,
                     user_id=user_id,
                     top_k=4,
                 )

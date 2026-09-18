@@ -220,7 +220,15 @@ export function AdminPanel() {
           {activeSection === "knowledge" && (
             <KnowledgeSection
               documents={documents}
-              onOpenAddDoc={() => docMgmt.setAddDocOpen(true)}
+              onOpenAddDoc={() => {
+                if (currentUser?.role === "org_admin" || currentUser?.role === "team_admin") {
+                  docMgmt.setUploadDocOrgId(currentUser.organizationId || "");
+                }
+                if (currentUser?.role === "team_admin") {
+                  docMgmt.setUploadDocTeamId(currentUser.teamId || "global");
+                }
+                docMgmt.setAddDocOpen(true);
+              }}
               onDeleteDoc={(docId) =>
                 confirmDelete(
                   "حذف سند از پایگاه دانش",
