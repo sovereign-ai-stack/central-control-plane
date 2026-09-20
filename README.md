@@ -4,8 +4,7 @@
 [![Docker Compose](https://img.shields.io/badge/docker-compose-v2-blue.svg)](https://docs.docker.com/compose/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?style=flat&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Security Policy](https://img.shields.io/badge/security-policy-red.svg)](SECURITY.md)
-[![Code of Conduct](https://img.shields.io/badge/code%20of-conduct-orange.svg)](CODE_OF_CONDUCT.md)
+
 
 Sovereign AI Control Plane is an enterprise-grade, self-hosted, air-gapped API gateway, semantic router, and orchestration hub for local LLM ecosystems. Designed for strictly regulated organizations requiring 100% data sovereignty, it unifies distributed, consumer-grade GPU workers into an encrypted mesh, enforces granular multi-tenant quotas, executes sub-5ms intent routing, and provides grounded document retrieval through isolated vector pipelines.
 
@@ -31,7 +30,6 @@ The public repository contains the core orchestration gateway, semantic classifi
 - [Production Hardening & Reverse Proxy](#production-hardening--reverse-proxy)
 - [Backup & Disaster Recovery](#backup--disaster-recovery)
 - [Project Structure](#project-structure)
-- [Governance](#governance)
 - [License](#license)
 
 ---
@@ -306,14 +304,6 @@ central-control-plane/
 ├── Dockerfile.gateway    # Production multi-stage build for FastAPI gateway
 └── server.py             # Entrypoint runner for gateway execution
 ```
-
----
-
-## Governance
-
-- Review our [Code of Conduct](CODE_OF_CONDUCT.md) for community participation standards.
-- Check the [Contributing Guide](CONTRIBUTING.md) before submitting patches or feature requests.
-- Read our [Security Policy](SECURITY.md) for responsible vulnerability disclosure.
 
 ---
 
